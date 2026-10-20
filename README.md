@@ -24,9 +24,25 @@ SixteenCloud wraps the SoundCloud web player in Electron and adds the parts a mu
 
 ## Screenshots
 
-| Charts | Settings |
+![Discover](docs/screenshots/home.jpg)
+
+### Settings and appearance
+
+| Settings | Themes |
 | :---: | :---: |
-| ![Charts](docs/screenshots/home.png) | ![Settings](docs/screenshots/settings.png) |
+| ![Settings](docs/screenshots/settings.jpg)<br>*Language, accent color, keybinds, visualizer* | ![Themes](docs/screenshots/themes.jpg)<br>*Default, AMOLED Black, Light, Nord, Catppuccin Mocha, Dracula* |
+
+### Playback tools
+
+| Synced lyrics | Downloader |
+| :---: | :---: |
+| ![Synced lyrics](docs/screenshots/lyrics.jpg)<br>*Time-synced lyrics with auto-scroll* | ![Downloader](docs/screenshots/downloader.jpg)<br>*Queue, quality presets, output folder, history* |
+
+### Integrations and protection
+
+| Adblocker | Discord Rich Presence |
+| :---: | :---: |
+| ![Adblocker](docs/screenshots/adblocker.jpg)<br>*Request blocking, custom rules, whitelist* | ![Discord Rich Presence](docs/screenshots/discord.jpg)<br>*Track, artist, elapsed time and buttons* |
 
 ## Features
 
