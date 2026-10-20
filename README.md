@@ -1,14 +1,14 @@
 <div align="center">
 
-<img src="assets/sixteencloud_logo_dark.svg" width="96" alt="SixteenCloud logo">
+<img src="icons/sixteencloud_logo_light.svg" width="96" alt="SixteenCloud logo">
 
 # SixteenCloud
 
 **A desktop SoundCloud client that feels native.**
 Ad-free playback · synced lyrics · 10-band EQ · visualizer · downloads · Discord RPC
 
-[![Latest release](https://img.shields.io/github/v/release/npukolno/sixteencloud?style=flat-square&color=e8500a)](https://github.com/npukolno/sixteencloud/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/npukolno/sixteencloud/total?style=flat-square&color=333)](https://github.com/npukolno/sixteencloud/releases)
+[![Latest release](https://img.shields.io/github/v/release/npukolno/sixteencloud?style=flat-square&label=latest&color=e8500a)](https://github.com/npukolno/sixteencloud/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/npukolno/sixteencloud/total?style=flat-square&label=total%20downloads&color=333)](https://github.com/npukolno/sixteencloud/releases)
 [![Platforms](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-333?style=flat-square)](#install)
 [![License](https://img.shields.io/badge/license-MIT-333?style=flat-square)](LICENSE)
 
