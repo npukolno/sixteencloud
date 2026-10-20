@@ -1,0 +1,28 @@
+node_modules/
+dist/
+release/
+*.js.map
+*.d.ts
+
+# Local credentials and signing material
+certs/*.pfx
+certs/*.p12
+*.pem
+
+# Android local/build output
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/*hs_err_pid*.log
+android/replay_pid*.log
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+
+# Local agent/editor state
+.agent/
+.claude/
+.opencode/
+*.log

@@ -1,0 +1,117 @@
+{
+  "name": "sixteencloud",
+  "version": "3.0.0",
+  "description": "SixteenCloud",
+  "desktopName": "SixteenCloud",
+  "homepage": "https://ocb2016.me",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "node ./node_modules/typescript/bin/tsc && node scripts/build-preload.mjs && node scripts/build-pulse-shim.mjs",
+    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
+    "test": "npm run build && node --test test/**/*.test.mjs",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron .",
+    "generate-icons": "node scripts/generate-icons.js",
+    "package": "npm run build && npm run generate-icons && electron-builder --win",
+    "package:linux": "npm run build && npm run generate-icons && electron-builder --linux AppImage deb pacman",
+    "package:mac": "npm run build && npm run generate-icons && electron-builder --mac zip"
+  },
+  "author": {
+    "name": "ocb2016 publishing®",
+    "email": "ocb2016@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/archiver": "^7.0.0",
+    "cross-env": "^10.1.0",
+    "electron": "^41.1.1",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "png-to-ico": "^2.1.8",
+    "sharp": "^0.35.4",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "archiver-utils": "^5.0.2",
+    "discord-rpc": "^4.0.1",
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.1.0",
+    "ffmpeg-static": "^5.3.0",
+    "mpris-service": "^2.1.2"
+  },
+  "overrides": {
+    "xml2js": "^0.5.0"
+  },
+  "build": {
+    "appId": "com.sixteencloud.app",
+    "productName": "SixteenCloud",
+    "copyright": "Copyright © ocb2016 publishing®",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "assets/**/*",
+      "src/renderer/splash.html",
+      "package.json",
+      "!certs/**",
+      "!release/**",
+      "!.agent/**",
+      "!**/*.map",
+      "!**/*.log"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "npukolno",
+        "repo": "sixteencloud"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icons/icon.ico",
+      "requestedExecutionLevel": "asInvoker",
+      "legalTrademarks": "ocb2016 publishing®"
+    },
+    "pacman": {
+      "depends": [
+        "gtk3",
+        "nss",
+        "libxss",
+        "libnotify"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "pacman"
+      ],
+      "maintainer": "ocb2016 publishing® <ocb2016@users.noreply.github.com>",
+      "category": "AudioVideo",
+      "syncDesktopName": true,
+      "icon": "assets/icons",
+      "synopsis": "SoundCloud desktop client"
+    },
+    "artifactName": "${productName}.Setup.${version}.${ext}",
+    "protocols": [
+      {
+        "name": "SixteenCloud",
+        "schemes": [
+          "sixteencloud"
+        ]
+      }
+    ],
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "installerIcon": "assets/icons/icon.ico",
+      "uninstallerIcon": "assets/icons/icon.ico",
+      "installerHeaderIcon": "assets/icons/icon.ico",
+      "installerHeader": "assets/installer-header.bmp",
+      "deleteAppDataOnUninstall": false,
+      "shortcutName": "SixteenCloud"
+    }
+  }
+}
