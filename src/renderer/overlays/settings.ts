@@ -79,19 +79,19 @@ export function getSettingsOverlayHTML(): string {
       </div>
 
       <div id="sc-set-visualizer-type-group" style="margin-left: 24px; margin-top: 8px; display: none;">
-        <span class="sc-overlay-label" style="font-size: 12px;">Вид визуализации</span>
+        <span class="sc-overlay-label" style="font-size: 12px;">${t('settings.visualizer_type')}</span>
         <div class="sc-custom-dropdown" id="sc-set-visualizer-type-dropdown" style="margin-top: 4px;">
           <div class="sc-custom-dropdown-trigger" id="sc-set-visualizer-type-trigger">
-            <span id="sc-set-visualizer-type-value">Боковые столбики</span>
+            <span id="sc-set-visualizer-type-value">${t('settings.viz_side')}</span>
             <svg class="sc-custom-dropdown-arrow" width="12" height="12" viewBox="0 0 12 12">
               <path fill="currentColor" d="M6 8L1 3h10z"/>
             </svg>
           </div>
           <div class="sc-custom-dropdown-menu" id="sc-set-visualizer-type-menu">
-            <div class="sc-custom-dropdown-item" data-value="side">Боковые столбики</div>
-            <div class="sc-custom-dropdown-item" data-value="above">Над плеером</div>
-            <div class="sc-custom-dropdown-item" data-value="wave">Волна на прогрессе</div>
-            <div class="sc-custom-dropdown-item" data-value="glow">Свечение обложки</div>
+            <div class="sc-custom-dropdown-item" data-value="side">${t('settings.viz_side')}</div>
+            <div class="sc-custom-dropdown-item" data-value="above">${t('settings.viz_above')}</div>
+            <div class="sc-custom-dropdown-item" data-value="wave">${t('settings.viz_wave')}</div>
+            <div class="sc-custom-dropdown-item" data-value="glow">${t('settings.viz_glow')}</div>
           </div>
         </div>
       </div>
