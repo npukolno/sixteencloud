@@ -4,144 +4,194 @@ import { TrackInfo } from '../shared/types';
 import { getStore } from './ipc';
 import { logInfo } from './logger';
 import { isAllowedMediaUrl, isTrustedSoundCloudUrl } from '../shared/security';
+import { t } from '../shared/i18n';
+import { DiscordIpcClient } from './discord-ipc';
 
 const DISCORD_CLIENT_ID = '1488109970095607908';
 // Asset name in Discord Developer Portal — upload icon.png as 'sixteencloud' asset
 const SIXTEENCLOUD_ICON = 'icon-1024';
+const RETRY_INTERVAL_MS = 5000;
+// Discord self-advances timestamps; only re-anchor after a seek larger than this.
+const SEEK_TOLERANCE_SECONDS = 20;
 
-let rpcClient: any = null;
+interface DiscordActivity {
+  type: number;
+  details?: string;
+  state?: string;
+  timestamps?: { start?: number; end?: number };
+  assets?: {
+    large_image?: string;
+    large_text?: string;
+    small_image?: string;
+    small_text?: string;
+  };
+  buttons?: Array<{ label: string; url: string }>;
+  instance?: boolean;
+}
+
+let rpcClient: DiscordIpcClient | null = null;
 let connected = false;
+let connecting = false;
 let currentTrack: TrackInfo | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let mainWin: BrowserWindow | null = null;
+let lastError = '';
+let lastEndpoint: string | null = null;
+let lastActivityKey = '';
+let timeAnchor: { key: string; start: number; end: number } | null = null;
 
-async function connectRPC(): Promise<void> {
-  if (connected || rpcClient) return;
-
-  try {
-    const DiscordRPC = require('discord-rpc');
-    DiscordRPC.register(DISCORD_CLIENT_ID);
-    rpcClient = new DiscordRPC.Client({ transport: 'ipc' });
-
-    rpcClient.on('ready', () => {
-      connected = true;
-      // Patch request to inject type: 2 (LISTENING) into SET_ACTIVITY
-      const origRequest = rpcClient.request.bind(rpcClient);
-      rpcClient.request = function(cmd: string, payload: any) {
-        if (cmd === 'SET_ACTIVITY' && payload && payload.activity) {
-          payload.activity.type = 2;
-        }
-        return origRequest(cmd, payload);
-      };
-      sendState();
-      updatePresence();
-    });
-
-    rpcClient.on('disconnected', () => {
-      connected = false;
-      rpcClient = null;
-      sendState();
-      scheduleRetry();
-    });
-
-    await rpcClient.login({ clientId: DISCORD_CLIENT_ID });
-  } catch (err: any) {
-    logInfo('[Discord RPC] connect error:', err?.message || err);
-    connected = false;
-    rpcClient = null;
-    sendState();
-    scheduleRetry();
-  }
-}
-
-function scheduleRetry(): void {
-  if (retryTimer) return;
-  retryTimer = setTimeout(() => {
-    retryTimer = null;
-    const store = getStore();
-    if (store && store.get('discordRp.enabled')) {
-      connectRPC();
-    }
-  }, 15000);
+function isEnabled(): boolean {
+  const store = getStore();
+  return !!store?.get('discordRp.enabled');
 }
 
 function sendState(): void {
   if (!mainWin || mainWin.isDestroyed() || mainWin.webContents.isDestroyed()) return;
   const store = getStore();
+  const enabled = !!store?.get('discordRp.enabled');
   try {
     mainWin.webContents.send(IPC_CHANNELS.DISCORD_STATE, {
       connected,
-      enabled: !!store?.get('discordRp.enabled'),
+      enabled,
       track: currentTrack,
+      error: enabled && !connected ? (lastError || t('discord.not_running')) : undefined,
     });
   } catch { /* renderer may close between the checks and send */ }
 }
 
-function updatePresence(): void {
+async function connectRPC(): Promise<void> {
+  if (connecting || rpcClient || !isEnabled()) return;
+
+  connecting = true;
+  lastError = '';
+  const client = new DiscordIpcClient(DISCORD_CLIENT_ID);
+  let ok = false;
+  try {
+    ok = await client.connect(lastEndpoint);
+  } catch (err: any) {
+    logInfo('[Discord RPC] connect error:', err?.message || err);
+  }
+  connecting = false;
+
+  if (!ok || !client.isConnected) {
+    client.disconnect();
+    lastError = t('discord.not_running');
+    sendState();
+    scheduleRetry();
+    return;
+  }
+
+  if (!isEnabled()) {
+    client.disconnect();
+    sendState();
+    return;
+  }
+
+  rpcClient = client;
+  connected = true;
+  lastError = '';
+  lastEndpoint = client.endpoint;
+  logInfo('[Discord RPC] connected via', lastEndpoint || 'unknown endpoint');
+
+  client.on('close', () => {
+    if (rpcClient !== client) return;
+    connected = false;
+    rpcClient = null;
+    lastActivityKey = '';
+    timeAnchor = null;
+    sendState();
+    scheduleRetry();
+  });
+
+  sendState();
+  updatePresence(true);
+}
+
+function scheduleRetry(): void {
+  if (retryTimer) return;
+  if (!isEnabled()) return;
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    if (isEnabled()) {
+      void connectRPC();
+    }
+  }, RETRY_INTERVAL_MS);
+}
+
+function clearPresence(): void {
   if (!rpcClient || !connected) return;
+  if (lastActivityKey === '__cleared__') return;
+  lastActivityKey = '__cleared__';
+  rpcClient.setActivity(null).catch((err: any) => {
+    logInfo('[Discord RPC] clear error:', err?.message || err);
+  });
+}
 
-  const store = getStore();
-  if (!store || !store.get('discordRp.enabled')) return;
+function buildActivity(
+  showArtist: boolean,
+  showTime: boolean,
+  displaySmallIcon: boolean,
+  displayButtons: boolean,
+  useArtistName: boolean,
+): DiscordActivity | null {
+  if (!currentTrack) return null;
 
-  // If no track or track is paused and displayWhenPaused is off, clear presence
-  if (!currentTrack) {
-    try { rpcClient.clearActivity(); } catch { /* Expected: may fail during disconnect */ }
-    return;
-  }
+  const title = (currentTrack.title || 'Unknown Track').slice(0, 128);
+  const artist = (currentTrack.artist || '').slice(0, 128);
 
-  const displayWhenPaused = store.get('discordRp.displayWhenPaused');
-  if (!currentTrack.isPlaying && !displayWhenPaused) {
-    try { rpcClient.clearActivity(); } catch { /* Expected: may fail during disconnect */ }
-    return;
-  }
-
-  const showArtist = store.get('discordRp.showArtist');
-  const showTime = store.get('discordRp.showTime');
-  const displaySmallIcon = store.get('discordRp.displaySmallIcon');
-  const displayButtons = store.get('discordRp.displayButtons');
-  const useArtistName = store.get('discordRp.useArtistName');
-
-  // Discord RPC supports external URLs for images if they start with https://
   let artworkKey = 'soundcloud';
   if (currentTrack.artworkUrl && currentTrack.artworkUrl.startsWith('https://')) {
     artworkKey = currentTrack.artworkUrl;
   }
 
-  // Discord RPC layout:
-  // "Слушает SixteenCloud" — app name from Developer Portal
-  // Line 1 (details): track title
-  // Line 2 (state): by artist
-  // Hover on artwork: track title
-  const activity: any = {
-    details: currentTrack.title || 'Unknown Track',
-    state: showArtist && currentTrack.artist ? `by ${currentTrack.artist}` : undefined,
-    largeImageKey: artworkKey,
-    largeImageText: 'SixteenCloud',
+  const activity: DiscordActivity = {
+    type: 2,
+    details: title,
+    state: showArtist && artist ? `by ${artist}` : undefined,
+    assets: {
+      large_image: artworkKey,
+      large_text: 'SixteenCloud',
+    },
     instance: false,
   };
 
   // "Artist as app name" — swap: bold line = artist, second line = track
-  if (showArtist && currentTrack.artist && useArtistName) {
-    activity.details = currentTrack.artist;
-    activity.state = currentTrack.title || 'Unknown Track';
+  if (showArtist && artist && useArtistName) {
+    activity.details = artist;
+    activity.state = title;
   }
 
-  // Small icon — SixteenCloud logo
   if (displaySmallIcon) {
-    activity.smallImageKey = SIXTEENCLOUD_ICON;
-    activity.smallImageText = 'SixteenCloud';
+    activity.assets!.small_image = SIXTEENCLOUD_ICON;
+    activity.assets!.small_text = 'SixteenCloud';
   }
 
-  // Timestamps
   if (showTime && currentTrack.isPlaying && currentTrack.duration > 0) {
-    const now = Date.now();
     const elapsedSeconds = Math.max(0, Math.min(currentTrack.duration, currentTrack.currentTime || 0));
-    const elapsed = elapsedSeconds * 1000;
-    activity.startTimestamp = new Date(now - elapsed);
-    activity.endTimestamp = new Date(now + (currentTrack.duration - elapsedSeconds) * 1000);
+    const anchorKey = `${currentTrack.trackUrl}|${title}|${currentTrack.duration}`;
+    const predictedElapsed = timeAnchor && timeAnchor.key === anchorKey
+      ? (Date.now() - timeAnchor.start) / 1000
+      : Number.NaN;
+    if (
+      !timeAnchor
+      || timeAnchor.key !== anchorKey
+      || Math.abs(predictedElapsed - elapsedSeconds) > SEEK_TOLERANCE_SECONDS
+    ) {
+      const now = Date.now();
+      timeAnchor = {
+        key: anchorKey,
+        start: now - elapsedSeconds * 1000,
+        end: now + (currentTrack.duration - elapsedSeconds) * 1000,
+      };
+    }
+    activity.timestamps = {
+      start: Math.round(timeAnchor.start),
+      end: Math.round(timeAnchor.end),
+    };
+  } else if (!currentTrack.isPlaying) {
+    timeAnchor = null;
   }
 
-  // Buttons — deep link via intermediate page (falls back to GitHub releases)
   if (displayButtons && currentTrack.trackUrl) {
     let buttonUrl = currentTrack.trackUrl;
     try {
@@ -155,9 +205,46 @@ function updatePresence(): void {
     ];
   }
 
-  try {
-    rpcClient.setActivity(activity);
-  } catch { /* Expected: may fail during disconnect */ }
+  return activity;
+}
+
+function updatePresence(force = false): void {
+  if (!rpcClient || !connected) return;
+
+  const store = getStore();
+  if (!store || !store.get('discordRp.enabled')) return;
+
+  if (!currentTrack) {
+    clearPresence();
+    return;
+  }
+
+  const displayWhenPaused = store.get('discordRp.displayWhenPaused');
+  if (!currentTrack.isPlaying && !displayWhenPaused) {
+    clearPresence();
+    return;
+  }
+
+  const activity = buildActivity(
+    store.get('discordRp.showArtist'),
+    store.get('discordRp.showTime'),
+    store.get('discordRp.displaySmallIcon'),
+    store.get('discordRp.displayButtons'),
+    store.get('discordRp.useArtistName'),
+  );
+
+  if (!activity) {
+    clearPresence();
+    return;
+  }
+
+  const key = JSON.stringify(activity);
+  if (!force && key === lastActivityKey) return;
+  lastActivityKey = key;
+
+  rpcClient.setActivity(activity as unknown as Record<string, unknown>).catch((err: any) => {
+    logInfo('[Discord RPC] set activity error:', err?.message || err);
+  });
 }
 
 export function setupDiscordRPC(win: BrowserWindow): void {
@@ -182,26 +269,31 @@ export function setupDiscordRPC(win: BrowserWindow): void {
   ipcMain.handle(IPC_CHANNELS.DISCORD_TOGGLE, async (event, enabled: boolean) => {
     if (event.sender !== win.webContents) throw new Error('Unauthorized IPC sender');
     if (enabled) {
+      lastError = '';
+      sendState();
       await connectRPC();
     } else {
-      if (rpcClient) {
-        try { rpcClient.clearActivity(); } catch { /* Expected: may fail during disconnect */ }
-        try { rpcClient.destroy(); } catch { /* Expected: may fail during disconnect */ }
-        rpcClient = null;
-        connected = false;
-      }
       if (retryTimer) {
         clearTimeout(retryTimer);
         retryTimer = null;
       }
+      if (rpcClient) {
+        rpcClient.disconnect();
+        rpcClient = null;
+        connected = false;
+      }
+      lastActivityKey = '';
+      timeAnchor = null;
+      lastError = '';
       sendState();
     }
   });
 
   // Auto-connect if enabled
-  const store = getStore();
-  if (store && store.get('discordRp.enabled')) {
-    connectRPC();
+  if (isEnabled()) {
+    void connectRPC();
+  } else {
+    sendState();
   }
 }
 
@@ -211,10 +303,12 @@ export function destroyDiscordRPC(): void {
     retryTimer = null;
   }
   if (rpcClient) {
-    try { rpcClient.clearActivity(); } catch { /* Expected: may fail during disconnect */ }
-    try { rpcClient.destroy(); } catch { /* Expected: may fail during disconnect */ }
+    rpcClient.disconnect();
     rpcClient = null;
-    connected = false;
   }
+  connected = false;
+  connecting = false;
+  lastActivityKey = '';
+  timeAnchor = null;
   mainWin = null;
 }
