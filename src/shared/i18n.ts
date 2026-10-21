@@ -1,6 +1,7 @@
 type Language = 'en' | 'ru';
 
 let currentLanguage: Language = 'en';
+const MOD_P = process.platform === 'darwin' ? '⌘P' : 'Ctrl+P';
 
 const en: Record<string, string> = {
   // Nav labels
@@ -10,6 +11,7 @@ const en: Record<string, string> = {
   'nav.auth_token': 'OAuth Token',
   'nav.downloader': 'Downloader',
   'nav.history': 'History',
+  'nav.offline': 'Offline',
   'nav.lyrics': 'Lyrics',
   'nav.equalizer': 'Equalizer',
   'nav.visualizer': 'Visualizer',
@@ -26,14 +28,6 @@ const en: Record<string, string> = {
   'tray.quit': 'Quit',
 
   // Welcome screen
-  'welcome.title': 'Welcome to SixteenCloud!',
-  'welcome.desc': 'SixteenCloud is a custom, unofficial SoundCloud fork with removed ads, regional restrictions bypass, Discord Rich Presence, OAuth Token Login, and a built-in track downloader.',
-  'welcome.open_settings': 'Open Settings Hub',
-  'welcome.bookmarks_sidebar': 'Bookmarks Sidebar',
-  'welcome.play_pause': 'Play / Pause',
-  'welcome.close_panel': 'Close Panel',
-  'welcome.get_started': 'Get Started',
-  'welcome.credits': 'This fork was developed and released by me, <strong>ocb2016</strong> <span class="sc-welcome-heart">&hearts;</span><br><a href="https://ocb2016.me" target="_blank">ocb2016.me</a>',
 
   // Tour steps
   'tour.skip': 'Skip',
@@ -52,7 +46,7 @@ const en: Record<string, string> = {
   'tour.step5_title': 'Choose Your Theme',
   'tour.step5_desc': 'Customize the app appearance with built-in themes or create your own custom theme.',
   'tour.step6_title': "You're All Set!",
-  'tour.step6_desc': 'Open every section from the left rail. Esc closes the sheet, Space plays or pauses, Ctrl+B toggles the bookmarks panel, Ctrl+M opens the mini player. Enjoy!',
+  'tour.step6_desc': `Open every section from the left rail. Esc closes the sheet, Space plays or pauses, Ctrl+B toggles the bookmarks panel, ${MOD_P} toggles the mini player. Enjoy!`,
 
   // Updater banner
   'updater.available': 'Update v{version} available!',
@@ -75,6 +69,7 @@ const en: Record<string, string> = {
   'settings.bookmarks_sidebar': 'Bookmarks Sidebar',
   'settings.play_pause': 'Play / Pause',
   'settings.volume': 'Volume Up / Down',
+  'settings.mini_player': 'Mini Player',
   'settings.close_panel': 'Close Panel',
   'settings.visualizer': 'Sound Visualizer',
   'settings.visualizer_type': 'Visualizer view',
@@ -96,8 +91,6 @@ const en: Record<string, string> = {
   'settings.clearing': 'Clearing...',
   'settings.cache_cleared': 'Cache Cleared!',
   'settings.reset_confirm': 'Reset all SixteenCloud settings to defaults?',
-  'search.placeholder': 'Search...',
-  'search.no_results': 'No results found',
 
   // Adblocker overlay
   'adblocker.title': 'Adblocker',
@@ -130,6 +123,8 @@ const en: Record<string, string> = {
   // Discord RP overlay
   'discord.title': 'Discord Rich Presence',
   'discord.not_connected': 'Not connected',
+  'discord.not_running': 'Discord not running',
+  'discord.browser_hint': 'Works with any desktop build — stable, PTB, Canary, portable and custom clients. Discord in a browser has no local RPC and cannot receive Rich Presence.',
   'discord.enable': 'Enable Rich Presence',
   'discord.display_paused': 'Display when paused',
   'discord.display_options': 'Display Options',
@@ -274,9 +269,6 @@ const en: Record<string, string> = {
   'themes.drop_here': 'Drop .json theme file here',
 
   // Crossfade
-  'settings.crossfade': 'Crossfade',
-  'settings.crossfade_enable': 'Enable Crossfade',
-  'settings.crossfade_duration': 'Duration (seconds)',
 
   // Custom CSS overlay
   'css.title': 'Custom CSS',
@@ -312,18 +304,6 @@ const en: Record<string, string> = {
   'eq.waiting': 'Waiting for audio... Play a track and click the page.',
 
   // Visualizer overlay
-  'viz.title': 'Visualizer',
-  'viz.enable': 'Enable Visualizer',
-  'viz.type': 'Type',
-  'viz.bars': 'Bars',
-  'viz.wave': 'Wave',
-  'viz.circular': 'Circular',
-  'viz.color': 'Color',
-  'viz.preview': 'Preview',
-  'viz.audio_hint': 'Play a track and click anywhere on the page to activate audio.',
-  'viz.active': 'Active',
-  'viz.disabled': 'Disabled',
-  'viz.waiting': 'Waiting for audio... Play a track and click the page.',
 
   // Mini-Player
   'tray.mini_player': 'Mini Player',
@@ -353,6 +333,7 @@ const ru: Record<string, string> = {
   'nav.auth_token': 'OAuth Токен',
   'nav.downloader': 'Загрузчик',
   'nav.history': 'История',
+  'nav.offline': 'Офлайн',
   'nav.lyrics': 'Тексты песен',
   'nav.equalizer': 'Эквалайзер',
   'nav.visualizer': 'Визуализатор',
@@ -369,14 +350,6 @@ const ru: Record<string, string> = {
   'tray.quit': 'Выход',
 
   // Welcome screen
-  'welcome.title': 'Добро пожаловать в SixteenCloud!',
-  'welcome.desc': 'SixteenCloud — кастомный, неофициальный форк SoundCloud с удалённой рекламой, обходом региональных ограничений, Discord Rich Presence, авторизацией через OAuth Token и встроенным загрузчиком треков.',
-  'welcome.open_settings': 'Открыть настройки',
-  'welcome.bookmarks_sidebar': 'Панель закладок',
-  'welcome.play_pause': 'Воспроизведение / Пауза',
-  'welcome.close_panel': 'Закрыть панель',
-  'welcome.get_started': 'Начать',
-  'welcome.credits': 'Этот форк был разработан и выпущен мной, <strong>ocb2016</strong> <span class="sc-welcome-heart">&hearts;</span><br><a href="https://ocb2016.me" target="_blank">ocb2016.me</a>',
 
   // Tour steps
   'tour.skip': 'Пропустить',
@@ -395,7 +368,7 @@ const ru: Record<string, string> = {
   'tour.step5_title': 'Выберите вашу тему',
   'tour.step5_desc': 'Настройте внешний вид приложения встроенными темами или создайте свою.',
   'tour.step6_title': 'Всё готово!',
-  'tour.step6_desc': 'Все разделы открываются с панели слева. Esc закрывает панели, Space — воспроизведение и пауза, Ctrl+B — панель закладок, Ctrl+M — мини-плеер. Наслаждайтесь!',
+  'tour.step6_desc': `Все разделы открываются с панели слева. Esc закрывает панели, Space — воспроизведение и пауза, Ctrl+B — панель закладок, ${MOD_P} — мини-плеер. Наслаждайтесь!`,
 
   // Updater banner
   'updater.available': 'Доступно обновление v{version}!',
@@ -418,6 +391,7 @@ const ru: Record<string, string> = {
   'settings.bookmarks_sidebar': 'Панель закладок',
   'settings.play_pause': 'Воспроизведение / Пауза',
   'settings.volume': 'Громкость +/-',
+  'settings.mini_player': 'Мини-плеер',
   'settings.close_panel': 'Закрыть панель',
   'settings.visualizer': 'Визуализатор звука',
   'settings.visualizer_type': 'Вид визуализации',
@@ -439,8 +413,6 @@ const ru: Record<string, string> = {
   'settings.clearing': 'Очистка...',
   'settings.cache_cleared': 'Кэш очищен!',
   'settings.reset_confirm': 'Сбросить все настройки SixteenCloud?',
-  'search.placeholder': 'Поиск...',
-  'search.no_results': 'Ничего не найдено',
 
   // Adblocker overlay
   'adblocker.title': 'Блокировщик рекламы',
@@ -473,6 +445,8 @@ const ru: Record<string, string> = {
   // Discord RP overlay
   'discord.title': 'Discord Rich Presence',
   'discord.not_connected': 'Не подключено',
+  'discord.not_running': 'Discord не запущен',
+  'discord.browser_hint': 'Работает с любой десктопной сборкой — stable, PTB, Canary, portable и кастомными клиентами. Discord в браузере не имеет локального RPC и не может принимать Rich Presence.',
   'discord.enable': 'Включить Rich Presence',
   'discord.display_paused': 'Отображать на паузе',
   'discord.display_options': 'Параметры отображения',
@@ -617,9 +591,6 @@ const ru: Record<string, string> = {
   'themes.drop_here': 'Перетащите .json файл темы сюда',
 
   // Crossfade
-  'settings.crossfade': 'Кроссфейд',
-  'settings.crossfade_enable': 'Включить кроссфейд',
-  'settings.crossfade_duration': 'Длительность (секунды)',
 
   // Custom CSS overlay
   'css.title': 'Свой CSS',
@@ -655,18 +626,6 @@ const ru: Record<string, string> = {
   'eq.waiting': 'Ожидание аудио... Включите трек и нажмите на страницу.',
 
   // Visualizer overlay
-  'viz.title': 'Визуализатор',
-  'viz.enable': 'Включить визуализатор',
-  'viz.type': 'Тип',
-  'viz.bars': 'Столбцы',
-  'viz.wave': 'Волна',
-  'viz.circular': 'Круговой',
-  'viz.color': 'Цвет',
-  'viz.preview': 'Предпросмотр',
-  'viz.audio_hint': 'Начните воспроизведение и нажмите на страницу для активации.',
-  'viz.active': 'Активен',
-  'viz.disabled': 'Отключён',
-  'viz.waiting': 'Ожидание аудио... Включите трек и нажмите на страницу.',
 
   // Mini-Player
   'tray.mini_player': 'Мини-плеер',

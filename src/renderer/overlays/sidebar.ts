@@ -16,7 +16,7 @@ export function getSidebarOverlayHTML(): string {
       <div class="sc-overlay-group" style="margin-top: 16px;">
         <span class="sc-overlay-label">${t('sidebar.your_bookmarks')}</span>
         <ul class="sc-overlay-list" id="sc-sidebar-list"></ul>
-        <div id="sc-sidebar-empty" style="color: #666; font-size: 13px; text-align: center; padding: 20px 0;">${t('sidebar.no_bookmarks')}</div>
+        <div id="sc-sidebar-empty" style="color: var(--sc-text-subtle); font-size: 13px; text-align: center; padding: 20px 0;">${t('sidebar.no_bookmarks')}</div>
       </div>
     </div>
   `;

@@ -44,21 +44,21 @@ export function getDownloaderOverlayHTML(): string {
 
       <!-- Single track progress -->
       <div id="sc-dl-single-progress" style="display: none; margin-top: 12px;">
-        <div style="font-size: 13px; color: #ccc; margin-bottom: 6px;" id="sc-dl-single-track-name"></div>
+        <div style="font-size: 13px; color: var(--sc-text); margin-bottom: 6px;" id="sc-dl-single-track-name"></div>
         <div style="position: relative; height: 24px; background: rgba(255,255,255,0.08); border-radius: 6px; overflow: hidden;">
-          <div id="sc-dl-single-bar" style="height: 100%; background: linear-gradient(90deg, #f50, #ff8c00); border-radius: 6px; transition: width 0.3s; width: 0%;"></div>
+          <div id="sc-dl-single-bar" style="height: 100%; background: linear-gradient(90deg, var(--sc-accent), var(--sc-accent-hover)); border-radius: 6px; transition: width 0.3s; width: 0%;"></div>
           <div id="sc-dl-single-percent" style="position: absolute; top: 0; left: 0; right: 0; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">0%</div>
         </div>
-        <div style="font-size: 12px; color: #999; margin-top: 4px;" id="sc-dl-single-stage"></div>
+        <div style="font-size: 12px; color: var(--sc-text-muted); margin-top: 4px;" id="sc-dl-single-stage"></div>
       </div>
 
       <!-- Playlist progress -->
       <div id="sc-dl-playlist-progress" style="display: none; margin-top: 12px;">
-        <div style="font-size: 13px; color: #ccc; margin-bottom: 4px;" id="sc-dl-playlist-track-name"></div>
-        <div style="font-size: 12px; color: #999; margin-bottom: 6px;" id="sc-dl-playlist-status"></div>
+        <div style="font-size: 13px; color: var(--sc-text); margin-bottom: 4px;" id="sc-dl-playlist-track-name"></div>
+        <div style="font-size: 12px; color: var(--sc-text-muted); margin-bottom: 6px;" id="sc-dl-playlist-status"></div>
         <!-- Overall playlist bar -->
         <div style="position: relative; height: 20px; background: rgba(255,255,255,0.08); border-radius: 6px; overflow: hidden; margin-bottom: 4px;">
-          <div id="sc-dl-playlist-bar" style="height: 100%; background: linear-gradient(90deg, #f50, #ff8c00); border-radius: 6px; transition: width 0.3s; width: 0%;"></div>
+          <div id="sc-dl-playlist-bar" style="height: 100%; background: linear-gradient(90deg, var(--sc-accent), var(--sc-accent-hover)); border-radius: 6px; transition: width 0.3s; width: 0%;"></div>
           <div id="sc-dl-playlist-percent" style="position: absolute; top: 0; left: 0; right: 0; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">0%</div>
         </div>
         <!-- Current track bar -->
@@ -72,7 +72,7 @@ export function getDownloaderOverlayHTML(): string {
         <button class="sc-overlay-btn sc-overlay-btn-secondary sc-overlay-btn-full" id="sc-dl-set-dir">
           ${t('downloader.choose_folder')}
         </button>
-        <div style="font-size: 12px; color: #888; margin-top: 6px;" id="sc-dl-dir-display">~/Music/SixteenCloud/</div>
+        <div style="font-size: 12px; color: var(--sc-text-muted); margin-top: 6px;" id="sc-dl-dir-display">~/Music/SixteenCloud/</div>
       </div>
 
       <!-- Queue section -->
@@ -82,7 +82,7 @@ export function getDownloaderOverlayHTML(): string {
           <button class="sc-overlay-btn sc-overlay-btn-secondary sc-queue-toggle" id="sc-dl-queue-toggle" aria-label="${t('downloader.queue_pause')}" title="${t('downloader.queue_pause')}">${QUEUE_PAUSE_SVG}</button>
         </div>
         <ul class="sc-overlay-list" id="sc-dl-queue-list" style="max-height:200px;overflow-y:auto;">
-          <li class="sc-overlay-list-item" style="color:#888;font-size:12px;">${t('downloader.queue_empty')}</li>
+          <li class="sc-overlay-list-item" style="color:var(--sc-text-muted);font-size:12px;">${t('downloader.queue_empty')}</li>
         </ul>
       </div>
 
@@ -325,7 +325,7 @@ export function getDownloaderOverlayScript(): string {
           quality: qualitySelect.value
         }).catch(function(err) {
           singleStage.textContent = _t('downloader.error', {error: err});
-          singleStage.style.color = '#f44';
+          singleStage.style.color = 'var(--sc-danger)';
           dlBtn.disabled = false;
         });
       });
@@ -402,7 +402,7 @@ export function getDownloaderOverlayScript(): string {
         // Single track progress
         singleBar.style.width = (p.percent || 0) + '%';
         singlePercent.textContent = (p.percent || 0) + '%';
-        singleStage.style.color = '#999';
+        singleStage.style.color = 'var(--sc-text-muted)';
         singleStage.textContent = p.status === 'downloading' ? _t('downloader.downloading', {percent: '' + p.percent})
           : p.status === 'converting' ? _t('downloader.converting')
           : p.status === 'tagging' ? _t('downloader.tagging')
@@ -425,7 +425,7 @@ export function getDownloaderOverlayScript(): string {
         dlBtn.disabled = false;
         if (result.error) {
           singleStage.textContent = _t('downloader.error', {error: result.error});
-          singleStage.style.color = '#f44';
+          singleStage.style.color = 'var(--sc-danger)';
         } else {
           singleBar.style.width = '100%';
           singlePercent.textContent = '100%';
@@ -479,7 +479,7 @@ export function getDownloaderOverlayScript(): string {
         queueToggle.title = state.paused ? _t('downloader.queue_resume') : _t('downloader.queue_pause');
         queueToggle.setAttribute('aria-label', queueToggle.title);
         if (!state.items || !state.items.length) {
-          queueList.innerHTML = '<li class="sc-overlay-list-item" style="color:#888;font-size:12px;">' + _t('downloader.queue_empty') + '</li>';
+          queueList.innerHTML = '<li class="sc-overlay-list-item" style="color:var(--sc-text-muted);font-size:12px;">' + _t('downloader.queue_empty') + '</li>';
           return;
         }
         queueList.innerHTML = state.items.map(function(item) {
@@ -510,7 +510,7 @@ export function getDownloaderOverlayScript(): string {
           likedBtn.textContent = _t('downloader.download_liked');
           if (String(err).includes('auth')) {
             likedBtn.textContent = _t('downloader.liked_requires_auth');
-            likedBtn.style.color = '#f44';
+            likedBtn.style.color = 'var(--sc-danger)';
             setTimeout(function() { likedBtn.textContent = _t('downloader.download_liked'); likedBtn.style.color = ''; }, 3000);
           }
         });

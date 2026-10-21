@@ -49,25 +49,33 @@ export function getSettingsOverlayHTML(): string {
 
       <div class="sc-overlay-group" style="margin-top: 16px;">
         <span class="sc-overlay-label">${t('settings.keyboard_shortcuts')}</span>
-        <div style="font-size: 12px; color: #888; margin-bottom: 8px;">${t('settings.press_new_key')}</div>
         <div id="sc-set-keybinds">
           <div class="sc-overlay-list-item">
             <span class="sc-overlay-list-item-title">${t('settings.bookmarks_sidebar')}</span>
-            <span class="sc-overlay-badge">Ctrl+B</span>
+            <button class="sc-overlay-badge sc-keybind-btn" type="button" data-action="sidebar"></button>
           </div>
           <div class="sc-overlay-list-item">
             <span class="sc-overlay-list-item-title">${t('settings.play_pause')}</span>
-            <span class="sc-overlay-badge">Space</span>
+            <button class="sc-overlay-badge sc-keybind-btn" type="button" data-action="playPause"></button>
           </div>
           <div class="sc-overlay-list-item">
-            <span class="sc-overlay-list-item-title">${t('settings.volume')}</span>
-            <span class="sc-overlay-badge">Ctrl+Up/Down</span>
+            <span class="sc-overlay-list-item-title">${t('settings.volume')} ↑</span>
+            <button class="sc-overlay-badge sc-keybind-btn" type="button" data-action="volumeUp"></button>
+          </div>
+          <div class="sc-overlay-list-item">
+            <span class="sc-overlay-list-item-title">${t('settings.volume')} ↓</span>
+            <button class="sc-overlay-badge sc-keybind-btn" type="button" data-action="volumeDown"></button>
+          </div>
+          <div class="sc-overlay-list-item">
+            <span class="sc-overlay-list-item-title">${t('settings.mini_player')}</span>
+            <button class="sc-overlay-badge sc-keybind-btn" type="button" data-action="miniPlayer"></button>
           </div>
           <div class="sc-overlay-list-item">
             <span class="sc-overlay-list-item-title">${t('settings.close_panel')}</span>
             <span class="sc-overlay-badge">Esc</span>
           </div>
         </div>
+        <div id="sc-keybind-hint" style="font-size: 12px; color: var(--sc-text-muted); margin-top: 8px; min-height: 16px;">${t('settings.press_new_key')}</div>
       </div>
 
       <div class="sc-overlay-toggle" style="margin-top: 16px;">
@@ -108,10 +116,10 @@ export function getSettingsOverlayHTML(): string {
         <button class="sc-overlay-btn sc-overlay-btn-secondary sc-overlay-btn-full" id="sc-set-check-update">
           ${t('settings.check_updates')}
         </button>
-        <div style="font-size: 12px; color: #888; margin-top: 6px;" id="sc-set-update-status"></div>
+        <div style="font-size: 12px; color: var(--sc-text-muted); margin-top: 6px;" id="sc-set-update-status"></div>
         <button class="sc-overlay-btn sc-overlay-btn-primary sc-overlay-btn-full" id="sc-set-download-update" style="display:none;margin-top:6px;"></button>
-        <div id="sc-set-update-progress" style="display:none;margin-top:6px;width:100%;height:6px;background:#333;border-radius:3px;overflow:hidden;">
-          <div id="sc-set-update-progress-fill" style="height:100%;width:0%;background:#f50;border-radius:3px;transition:width 0.3s;"></div>
+        <div id="sc-set-update-progress" style="display:none;margin-top:6px;width:100%;height:6px;background:var(--sc-surface-raised);border-radius:3px;overflow:hidden;">
+          <div id="sc-set-update-progress-fill" style="height:100%;width:0%;background:var(--sc-accent);border-radius:3px;transition:width 0.3s;"></div>
         </div>
       </div>
 
@@ -127,7 +135,7 @@ export function getSettingsOverlayHTML(): string {
         </button>
       </div>
 
-      <div style="text-align: center; margin-top: 20px; color: #666; font-size: 12px;">
+      <div style="text-align: center; margin-top: 20px; color: var(--sc-text-subtle); font-size: 12px;">
         SixteenCloud v${app.getVersion()}
       </div>
     </div>
@@ -427,18 +435,18 @@ export function getSettingsOverlayScript(): string {
           if (result && result.available && result.version !== _currentVersion) {
             _foundVersion = result.version;
             updateStatus.textContent = _t('settings.update_available', {version: result.version});
-            updateStatus.style.color = '#2ecc71';
+            updateStatus.style.color = 'var(--sc-success)';
             downloadBtn.textContent = _t('settings.download_update', {version: result.version});
             downloadBtn.style.display = 'block';
           } else {
             updateStatus.textContent = _t('settings.up_to_date');
-            updateStatus.style.color = '#888';
+            updateStatus.style.color = 'var(--sc-text-muted)';
             downloadBtn.style.display = 'none';
           }
         }).catch(function() {
           checkUpdateBtn.disabled = false;
           updateStatus.textContent = _t('settings.check_failed');
-          updateStatus.style.color = '#e74c3c';
+          updateStatus.style.color = 'var(--sc-danger)';
         });
       });
 
@@ -467,6 +475,94 @@ export function getSettingsOverlayScript(): string {
         }
       });
 
+
+      // Keyboard shortcuts: click a badge, press the new combination.
+      var isMac = ${process.platform === 'darwin'};
+      var KEYBIND_DEFAULTS = {
+        sidebar: 'Ctrl+KeyB',
+        playPause: 'Space',
+        volumeUp: 'Ctrl+ArrowUp',
+        volumeDown: 'Ctrl+ArrowDown',
+        miniPlayer: isMac ? 'Meta+KeyP' : 'Ctrl+KeyP'
+      };
+      var keybinds = {};
+      var capturingAction = null;
+      var hintEl = panel.querySelector('#sc-keybind-hint');
+      var keybindBtns = panel.querySelectorAll('.sc-keybind-btn');
+
+      function keyCodeLabel(code, key) {
+        var map = { Space: 'Space', ArrowUp: '\u2191', ArrowDown: '\u2193', ArrowLeft: '\u2190', ArrowRight: '\u2192', Enter: 'Enter', Escape: 'Esc', Backspace: 'Backspace', Tab: 'Tab' };
+        if (map[code]) return map[code];
+        if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+        if (/^Digit[0-9]$/.test(code)) return code.slice(5);
+        if (/^F[0-9]{1,2}$/.test(code)) return code;
+        return key && key.length <= 3 ? key.toUpperCase() : code;
+      }
+
+      function comboLabel(combo) {
+        var parts = String(combo || '').split('+');
+        var out = [];
+        for (var i = 0; i < parts.length; i++) {
+          var p = parts[i];
+          if (p === 'Ctrl') out.push(isMac ? '\u2303' : 'Ctrl');
+          else if (p === 'Alt') out.push(isMac ? '\u2325' : 'Alt');
+          else if (p === 'Shift') out.push(isMac ? '\u21e7' : 'Shift');
+          else if (p === 'Meta') out.push(isMac ? '\u2318' : 'Meta');
+          else out.push(keyCodeLabel(p, p));
+        }
+        return out.join('+');
+      }
+
+      function renderKeybinds() {
+        for (var i = 0; i < keybindBtns.length; i++) {
+          var action = keybindBtns[i].getAttribute('data-action');
+          keybindBtns[i].textContent = comboLabel(keybinds[action] || KEYBIND_DEFAULTS[action]);
+          keybindBtns[i].classList.remove('sc-keybind-capturing');
+        }
+      }
+
+      function isModifierCode(code) {
+        return /^(Control|Alt|Shift|Meta)(Left|Right)$/.test(code);
+      }
+
+      function stopCapture() {
+        capturingAction = null;
+        hintEl.textContent = _t('settings.press_new_key');
+        renderKeybinds();
+      }
+
+      for (var b = 0; b < keybindBtns.length; b++) {
+        keybindBtns[b].addEventListener('click', function(e) {
+          e.preventDefault();
+          capturingAction = this.getAttribute('data-action');
+          this.textContent = '\u2026';
+          this.classList.add('sc-keybind-capturing');
+          hintEl.textContent = _t('settings.press_new_key');
+        });
+      }
+
+      document.addEventListener('keydown', function(e) {
+        if (!capturingAction) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.key === 'Escape') { stopCapture(); return; }
+        if (isModifierCode(e.code)) return;
+        var parts = [];
+        if (e.ctrlKey) parts.push('Ctrl');
+        if (e.altKey) parts.push('Alt');
+        if (e.shiftKey) parts.push('Shift');
+        if (e.metaKey) parts.push('Meta');
+        parts.push(e.code);
+        keybinds[capturingAction] = parts.join('+');
+        api.storeSet('settings.keybinds', keybinds);
+        stopCapture();
+      }, true);
+
+      api.storeGet('settings.keybinds').then(function(v) {
+        keybinds = (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+        renderKeybinds();
+      });
+
       clearCache.addEventListener('click', function() {
         clearCache.disabled = true;
         clearCache.textContent = _t('settings.clearing');
@@ -484,8 +580,8 @@ export function getSettingsOverlayScript(): string {
         if (existing) { existing.remove(); return; }
         var box = document.createElement('div');
         box.id = 'sc-confirm-reset';
-        box.style.cssText = 'margin-top:8px;padding:10px;background:#2a1a1a;border:1px solid #e74c3c;border-radius:6px;display:flex;align-items:center;justify-content:space-between;';
-        box.innerHTML = '<span style="color:#e74c3c;font-size:12px;">' + _t('settings.reset_confirm') + '</span><div style="display:flex;gap:6px;"><button id="sc-confirm-yes" style="background:#e74c3c;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">' + _t('common.yes') + '</button><button id="sc-confirm-no" style="background:#333;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">' + _t('common.no') + '</button></div>';
+        box.style.cssText = 'margin-top:8px;padding:10px;background:var(--sc-danger-soft);border:1px solid var(--sc-danger);border-radius:6px;display:flex;align-items:center;justify-content:space-between;';
+        box.innerHTML = '<span style="color:var(--sc-danger);font-size:12px;">' + _t('settings.reset_confirm') + '</span><div style="display:flex;gap:6px;"><button id="sc-confirm-yes" style="background:var(--sc-danger);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">' + _t('common.yes') + '</button><button id="sc-confirm-no" style="background:var(--sc-surface-raised);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">' + _t('common.no') + '</button></div>';
         resetAll.parentNode.insertBefore(box, resetAll.nextSibling);
         box.querySelector('#sc-confirm-yes').onclick = function() {
           api.storeSet('settings', { startMinimized: false, launchOnStartup: false, accentColor: '#ff5500', autoUpdate: true, keybinds: {} }).then(function() {

@@ -8,7 +8,7 @@ export function getCustomCssOverlayHTML(): string {
     <div class="sc-overlay-body">
       <div class="sc-overlay-group">
         <span class="sc-overlay-label">${t('css.code')}</span>
-        <textarea id="sc-custom-css-editor" class="sc-overlay-input" style="min-height: 300px; font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; font-size: 13px; line-height: 1.5; resize: vertical; white-space: pre; tab-size: 2;" placeholder="/* Enter your custom CSS here */&#10;&#10;.playControls {&#10;  background: #1a1a1a !important;&#10;}"></textarea>
+        <textarea id="sc-custom-css-editor" class="sc-overlay-input" style="min-height: 300px; font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; font-size: 13px; line-height: 1.5; resize: vertical; white-space: pre; tab-size: 2;" placeholder="/* Enter your custom CSS here */&#10;&#10;.playControls {&#10;  background: var(--sc-bg) !important;&#10;}"></textarea>
       </div>
 
       <div style="display: flex; gap: 8px;">
@@ -16,7 +16,7 @@ export function getCustomCssOverlayHTML(): string {
         <button class="sc-overlay-btn sc-overlay-btn-danger" id="sc-custom-css-clear">${t('css.clear')}</button>
       </div>
 
-      <div style="font-size: 12px; color: #666; margin-top: 12px;" id="sc-custom-css-status"></div>
+      <div style="font-size: 12px; color: var(--sc-text-subtle); margin-top: 12px;" id="sc-custom-css-status"></div>
     </div>
   `;
 }
@@ -72,7 +72,7 @@ export function getCustomCssOverlayScript(): string {
         api.storeSet('customCss.code', editor.value);
         applyCSS(editor.value);
         status.textContent = _t('css.saved');
-        status.style.color = '#2ecc71';
+        status.style.color = 'var(--sc-success)';
         setTimeout(function() { status.textContent = ''; }, 2000);
       });
 
@@ -81,7 +81,7 @@ export function getCustomCssOverlayScript(): string {
         api.storeSet('customCss.code', '');
         applyCSS('');
         status.textContent = _t('css.cleared');
-        status.style.color = '#888';
+        status.style.color = 'var(--sc-text-muted)';
         setTimeout(function() { status.textContent = ''; }, 2000);
       });
 

@@ -23,9 +23,9 @@ export function getOfflineOverlayHTML(): string {
         </div>
         <div style="margin-bottom: 12px;">
           <span class="sc-overlay-label">${t('offline.max_size')}: <span id="sc-offline-maxsize-label">500</span> MB</span>
-          <input type="range" id="sc-offline-maxsize" min="100" max="2000" step="100" value="500" style="width: 100%; margin-top: 6px; accent-color: #f50;">
+          <input type="range" id="sc-offline-maxsize" min="100" max="2000" step="100" value="500" style="width: 100%; margin-top: 6px; accent-color: var(--sc-accent);">
         </div>
-        <div id="sc-offline-status" style="color: #888; font-size: 13px; margin-bottom: 12px;"></div>
+        <div id="sc-offline-status" style="color: var(--sc-text-muted); font-size: 13px; margin-bottom: 12px;"></div>
       </div>
 
       <div class="sc-overlay-group" style="margin-top: 16px;">
@@ -34,7 +34,7 @@ export function getOfflineOverlayHTML(): string {
           <button class="sc-overlay-btn sc-overlay-btn-danger" id="sc-offline-clear" style="font-size: 12px; padding: 4px 10px;">${t('offline.clear_all')}</button>
         </div>
         <ul class="sc-overlay-list" id="sc-offline-list" style="margin-top: 8px; max-height: 300px; overflow-y: auto;"></ul>
-        <div id="sc-offline-empty" style="color: #666; font-size: 13px; text-align: center; padding: 20px 0;">${t('offline.no_cached')}</div>
+        <div id="sc-offline-empty" style="color: var(--sc-text-subtle); font-size: 13px; text-align: center; padding: 20px 0;">${t('offline.no_cached')}</div>
       </div>
     </div>
   `;
@@ -110,12 +110,12 @@ export function getOfflineOverlayScript(): string {
           tracks.forEach(function(t) {
             var li = document.createElement('li');
             li.className = 'sc-overlay-list-item';
-            li.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #222;';
+            li.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--sc-border);';
             li.innerHTML = '<div style="flex:1;min-width:0;">' +
-              '<div style="font-size:13px;color:#eee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + window.__scEscapeHtml(t.title) + '</div>' +
-              '<div style="font-size:11px;color:#888;">' + window.__scEscapeHtml(t.artist) + ' — ' + window.__scEscapeHtml(formatSize(t.fileSize)) + '</div>' +
+              '<div style="font-size:13px;color:var(--sc-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + window.__scEscapeHtml(t.title) + '</div>' +
+              '<div style="font-size:11px;color:var(--sc-text-muted);">' + window.__scEscapeHtml(t.artist) + ' — ' + window.__scEscapeHtml(formatSize(t.fileSize)) + '</div>' +
               '</div>' +
-              '<button class="sc-overlay-btn-icon sc-offline-remove" data-id="' + window.__scEscapeHtml(t.trackId) + '" style="color:#888;font-size:16px;cursor:pointer;" title="Remove" data-sc-icon="x" aria-label="Remove"></button>';
+              '<button class="sc-overlay-btn-icon sc-offline-remove" data-id="' + window.__scEscapeHtml(t.trackId) + '" style="color:var(--sc-text-muted);font-size:16px;cursor:pointer;" title="Remove" data-sc-icon="x" aria-label="Remove"></button>';
             listEl.appendChild(li);
           });
 
