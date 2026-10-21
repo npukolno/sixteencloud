@@ -24,17 +24,16 @@
   "devDependencies": {
     "@types/archiver": "^7.0.0",
     "cross-env": "^10.1.0",
-    "electron": "^41.1.1",
+    "electron": "^44.9.3",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
     "png-to-ico": "^2.1.8",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "typescript": "^5.6.0"
   },
   "dependencies": {
     "archiver": "^7.0.1",
     "archiver-utils": "^5.0.2",
-    "discord-rpc": "^4.0.1",
     "electron-store": "^8.2.0",
     "electron-updater": "^6.1.0",
     "ffmpeg-static": "^5.3.0",
