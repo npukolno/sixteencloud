@@ -9,6 +9,7 @@ import { logInfo, logWarn } from './logger';
 import archiver from 'archiver';
 import { StoreSchema, DownloadRequest } from '../shared/types';
 import { isAllowedMediaUrl, isTrustedSoundCloudUrl } from '../shared/security';
+import { KEYBIND_ACTIONS, parseCombo } from '../shared/keybinds';
 import { getCoverPalette } from './cover-palette';
 
 // Converting needs a real ffmpeg. The bundled ffmpeg-static binary can be
@@ -51,7 +52,7 @@ const STORE_KEYS = new Set([
   'downloader.history', 'settings', 'settings.startMinimized', 'settings.launchOnStartup', 'settings.accentColor',
   'settings.autoUpdate', 'settings.keybinds', 'history', 'history.enabled', 'history.maxTracks', 'history.tracks', 'history.stats', 'lyrics',
   'lyrics.fontSize', 'themes', 'themes.active', 'themes.custom', 'customCss', 'customCss.code', 'equalizer', 'visualizer',
-  'crossfade', 'crossfade.enabled', 'crossfade.duration', 'sidebar',
+  'sidebar',
   'sidebar.bookmarks', 'offlineCache', 'offlineCache.enabled', 'offlineCache.autoCache', 'offlineCache.maxSizeMB',
   'offlineCache.tracks',
 ]);
@@ -89,10 +90,14 @@ function validateStoreValue(key: string, value: unknown): void {
   if (key === 'history.stats' && (!value || typeof value !== 'object' || Array.isArray(value))) {
     throw new Error('Invalid history stats');
   }
-  if (key === 'crossfade.duration' && (typeof value !== 'number' || !Number.isFinite(value) || value < 1 || value > 15)) {
-    throw new Error('Invalid crossfade duration');
+  if (key === 'settings.keybinds') {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid keybinds');
+    for (const [action, combo] of Object.entries(value)) {
+      if (!(KEYBIND_ACTIONS as readonly string[]).includes(action) || typeof combo !== 'string' || !parseCombo(combo)) {
+        throw new Error('Invalid keybind');
+      }
+    }
   }
-  if ((key === 'crossfade.enabled') && typeof value !== 'boolean') throw new Error('Invalid crossfade state');
   if (key === 'equalizer') {
     const state = value as any;
     if (!state || typeof state !== 'object' || Array.isArray(state) || typeof state.enabled !== 'boolean' ||
@@ -229,6 +234,60 @@ async function getClientId(): Promise<string> {
   throw new Error('Could not find SoundCloud client_id. Try logging in with OAuth token first.');
 }
 
+export interface ResolvedTrackStream {
+  audioUrl: string;
+  trackData: {
+    id?: number;
+    genre?: string;
+    created_at?: string;
+    release_date?: string;
+    user?: { username?: string };
+  };
+}
+
+/**
+ * Resolve a SoundCloud track page to a directly fetchable audio URL.
+ * Shared by the downloader and the offline cache so both agree on the
+ * transcoding preference and the client_id refresh behaviour.
+ */
+export async function resolveTrackStream(trackUrl: string): Promise<ResolvedTrackStream> {
+  if (typeof trackUrl !== 'string' || !isTrustedSoundCloudUrl(trackUrl)) {
+    throw new Error('Invalid track URL');
+  }
+  const token = (store.get('authToken.token') || '') as string;
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `OAuth ${token}`;
+
+  let clientId = await getClientId();
+  let resolveUrl = `${SOUNDCLOUD_API_V2}/resolve?url=${encodeURIComponent(trackUrl)}&client_id=${clientId}`;
+  let resolveResp = await eFetch(resolveUrl, { headers });
+
+  if (resolveResp.status === 401 || resolveResp.status === 403) {
+    logInfo('[Downloader] Resolve returned ' + resolveResp.status + ', refreshing client_id...');
+    cachedClientId = null;
+    clientId = await getClientId();
+    resolveUrl = `${SOUNDCLOUD_API_V2}/resolve?url=${encodeURIComponent(trackUrl)}&client_id=${clientId}`;
+    resolveResp = await eFetch(resolveUrl, { headers });
+  }
+  if (!resolveResp.ok) throw new Error(`Resolve failed: ${resolveResp.status}`);
+  const trackData = await resolveResp.json() as ResolvedTrackStream['trackData'] & {
+    media?: { transcodings?: Array<{ url: string; format: { protocol: string; mime_type: string } }> };
+  };
+
+  const transcodings = trackData.media?.transcodings || [];
+  let streamInfo = transcodings.find(t => t.format.protocol === 'progressive');
+  if (!streamInfo) streamInfo = transcodings[0];
+  if (!streamInfo) throw new Error('No stream URL found');
+
+  const streamSep = streamInfo.url.includes('?') ? '&' : '?';
+  const streamResp = await eFetch(streamInfo.url + streamSep + 'client_id=' + clientId, { headers });
+  if (!streamResp.ok) throw new Error(`Stream URL fetch failed: ${streamResp.status}`);
+  const streamData = await streamResp.json() as { url: string };
+  if (!isAllowedMediaUrl(streamData.url)) throw new Error('SoundCloud returned an unsafe stream URL');
+
+  return { audioUrl: streamData.url, trackData };
+}
+
 function safeSend(win: BrowserWindow, channel: string, ...args: unknown[]): void {
   if (!win.isDestroyed()) win.webContents.send(channel, ...args);
 }
@@ -349,15 +408,23 @@ export function setupIPC(mainWindow: BrowserWindow): void {
 
   ipcMain.handle(IPC_CHANNELS.GEO_TEST_PROXY, async (event, proxyUrl: string) => {
     assertMainRenderer(event, mainWindow);
-    if (typeof proxyUrl !== 'string' || proxyUrl.length > 2048 || (proxyUrl && !/^(https?|socks5):\/\//i.test(proxyUrl))) return false;
+    if (typeof proxyUrl !== 'string' || proxyUrl.length > 2048 || !proxyUrl || !/^(https?|socks5):\/\//i.test(proxyUrl)) return false;
+    // Test through a throwaway session: changing defaultSession here would
+    // reroute the whole app through a proxy the user only meant to probe.
+    const testSession = session.fromPartition(`geo-proxy-test-${Date.now()}`, { cache: false });
     try {
-      if (proxyUrl) {
-        await session.defaultSession.setProxy({ proxyRules: proxyUrl });
-      }
-      const response = await eFetch('https://api.ipify.org?format=json');
+      await testSession.setProxy({ proxyRules: proxyUrl });
+      const response = await testSession.fetch('https://api.ipify.org?format=json', {
+        headers: { 'User-Agent': CHROME_UA },
+        signal: AbortSignal.timeout(8000),
+      });
       return response.ok;
     } catch {
       return false;
+    } finally {
+      try { await testSession.setProxy({ proxyRules: '' }); } catch { /* session is disposable */ }
+      try { await testSession.clearStorageData(); } catch { /* session is disposable */ }
+      try { await testSession.closeAllConnections(); } catch { /* already closed */ }
     }
   });
 
@@ -445,7 +512,6 @@ export function setupIPC(mainWindow: BrowserWindow): void {
   // Download track
   // Core download logic — reused by single download and queue
   async function downloadTrackCore(request: DownloadRequest): Promise<void> {
-    const token = (store.get('authToken.token') || '') as string;
     const outputDir = (store.get('downloader.outputDir') || path.join(app.getPath('music'), 'SixteenCloud')) as string;
 
     if (!fs.existsSync(outputDir)) {
@@ -458,33 +524,7 @@ export function setupIPC(mainWindow: BrowserWindow): void {
       status: 'downloading',
     });
 
-    let clientId = await getClientId();
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `OAuth ${token}`;
-
-    let resolveUrl = `${SOUNDCLOUD_API_V2}/resolve?url=${encodeURIComponent(request.trackUrl)}&client_id=${clientId}`;
-    let resolveResp = await eFetch(resolveUrl, { headers });
-
-    if (resolveResp.status === 401 || resolveResp.status === 403) {
-      logInfo('[Downloader] Resolve returned ' + resolveResp.status + ', refreshing client_id...');
-      cachedClientId = null;
-      clientId = await getClientId();
-      resolveUrl = `${SOUNDCLOUD_API_V2}/resolve?url=${encodeURIComponent(request.trackUrl)}&client_id=${clientId}`;
-      resolveResp = await eFetch(resolveUrl, { headers });
-    }
-    if (!resolveResp.ok) throw new Error(`Resolve failed: ${resolveResp.status}`);
-    const trackData = await resolveResp.json() as { id: number; genre?: string; created_at?: string; release_date?: string; user?: { username?: string }; media?: { transcodings?: Array<{ url: string; format: { protocol: string; mime_type: string } }> } };
-
-    const transcodings = trackData.media?.transcodings || [];
-    let streamInfo = transcodings.find((t: { format: { protocol: string } }) => t.format.protocol === 'progressive');
-    if (!streamInfo) streamInfo = transcodings[0];
-    if (!streamInfo) throw new Error('No stream URL found');
-
-    const streamSep = streamInfo.url.includes('?') ? '&' : '?';
-    const streamResp = await eFetch(streamInfo.url + streamSep + 'client_id=' + clientId, { headers });
-    if (!streamResp.ok) throw new Error(`Stream URL fetch failed: ${streamResp.status}`);
-    const streamData = await streamResp.json() as { url: string };
-    if (!isAllowedMediaUrl(streamData.url)) throw new Error('SoundCloud returned an unsafe stream URL');
+    const { audioUrl, trackData } = await resolveTrackStream(request.trackUrl);
 
     safeSend(mainWindow,IPC_CHANNELS.DOWNLOAD_PROGRESS, {
       trackId: request.trackId,
@@ -492,7 +532,7 @@ export function setupIPC(mainWindow: BrowserWindow): void {
       status: 'downloading',
     });
 
-    const audioResp = await eFetch(streamData.url);
+    const audioResp = await eFetch(audioUrl);
     if (!audioResp.ok) throw new Error(`Audio download failed: ${audioResp.status}`);
     const contentLength = parseInt(audioResp.headers.get('content-length') || '0', 10);
     if (contentLength > 500 * 1024 * 1024) throw new Error('File too large (>500MB)');

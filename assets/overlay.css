@@ -16,6 +16,10 @@
   --sc-accent-hover: #ff6a1a;
   --sc-accent-foreground: #ffffff;
   --sc-focus: rgba(255, 85, 0, 0.3);
+  --sc-danger: #e74c3c;
+  --sc-danger-soft: rgba(231, 76, 60, 0.14);
+  --sc-success: #2ecc71;
+  --sc-warning: #f39c12;
 }
 
 /* ===== Main Overlay Container ===== */
@@ -1027,6 +1031,29 @@ body {
   font-weight: 700;
   font-family: 'SF Mono', 'Cascadia Code', monospace;
   transition: background 150ms ease, color 150ms ease;
+}
+
+/* Keyboard shortcut badges are interactive: click to rebind. */
+.sc-keybind-btn {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: .2px;
+}
+.sc-keybind-btn:hover,
+.sc-keybind-btn:focus-visible {
+  background: var(--sc-accent-hover);
+  outline: none;
+}
+.sc-keybind-btn.sc-keybind-capturing {
+  background: transparent;
+  color: var(--sc-accent);
+  box-shadow: inset 0 0 0 1px var(--sc-accent);
+  animation: sc-keybind-pulse 1s ease-in-out infinite;
+}
+@keyframes sc-keybind-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .45; }
 }
 
 /* ===== Scrollbar (panels) ===== */

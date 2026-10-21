@@ -6,7 +6,7 @@ export function getTitlebarHTML(): string {
       left: 0;
       right: 0;
       height: 32px;
-      background: #1a1a1a;
+      background: var(--sc-bg);
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -31,14 +31,14 @@ export function getTitlebarHTML(): string {
           <path d="M264.062 291.875C259.687 291.875 256.25 295.313 255.937 300L250.938 481.875L255.937 565.313C255.937 569.688 259.687 573.438 264.062 573.438C268.437 573.438 271.875 570 272.188 565.313L277.812 481.875L272.188 300C271.875 295.313 268.437 291.875 264.062 291.875Z" fill="white"/>
           <path d="M297.188 295.938C292.5 295.938 288.438 299.687 288.438 304.687L283.75 481.875L288.438 564.688C288.438 569.688 292.5 573.437 297.188 573.437C301.875 573.437 305.937 569.688 305.937 564.688L311.25 481.875L305.937 304.687C305.937 299.687 302.188 295.938 297.188 295.938Z" fill="white"/>
           <path d="M330.625 301.562C325.313 301.562 321.25 305.625 321.25 310.938L316.875 481.875L321.25 564.062C321.25 569.375 325.625 573.438 330.625 573.438C335.938 573.438 340 569.375 340 564.062L344.688 481.875L340 310.938C340 305.937 335.938 301.562 330.625 301.562Z" fill="white"/>
-          <path d="M532.8 561H478.8V458.4L452.025 476.85L426.825 437.7L483.3 401.7H532.8V561ZM650.294 565.5C613.169 565.5 580.544 546.15 580.544 505.2C580.544 485.175 589.769 467.4 600.344 452.775L636.794 401.7H701.819L663.119 451.425V451.65H665.594C693.044 451.65 720.044 470.775 720.044 504.75C720.044 544.8 687.419 565.5 650.294 565.5ZM650.294 521.4C660.419 521.4 667.169 514.2 667.169 504.975C667.169 495.975 660.419 489 650.294 489C640.619 489 633.869 495.975 633.869 504.975C633.869 514.2 640.619 521.4 650.294 521.4Z" fill="#1a1a1a"/>
+          <path d="M532.8 561H478.8V458.4L452.025 476.85L426.825 437.7L483.3 401.7H532.8V561ZM650.294 565.5C613.169 565.5 580.544 546.15 580.544 505.2C580.544 485.175 589.769 467.4 600.344 452.775L636.794 401.7H701.819L663.119 451.425V451.65H665.594C693.044 451.65 720.044 470.775 720.044 504.75C720.044 544.8 687.419 565.5 650.294 565.5ZM650.294 521.4C660.419 521.4 667.169 514.2 667.169 504.975C667.169 495.975 660.419 489 650.294 489C640.619 489 633.869 495.975 633.869 504.975C633.869 514.2 640.619 521.4 650.294 521.4Z" fill="var(--sc-bg)"/>
         </svg>
-        <span style="color: #888; font-size: 12px; font-weight: 500;">SixteenCloud</span>
+        <span style="color: var(--sc-text-muted); font-size: 12px; font-weight: 500;">SixteenCloud</span>
       </div>
       <div id="sc-titlebar-controls" style="display: flex; height: 100%; -webkit-app-region: no-drag;">
-        <button id="sc-tb-min" aria-label="Minimize" style="width: 46px; height: 100%; border: none; background: transparent; color: #999; cursor: pointer; display: flex; align-items: center; justify-content: center;" onmouseover="this.style.background='#333'" onmouseout="this.style.background='transparent'"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 18h14"/></svg></button>
-        <button id="sc-tb-max" aria-label="Maximize" style="width: 46px; height: 100%; border: none; background: transparent; color: #999; cursor: pointer; display: flex; align-items: center; justify-content: center;" onmouseover="this.style.background='#333'" onmouseout="this.style.background='transparent'"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="1"/></svg></button>
-        <button id="sc-tb-close" aria-label="Close" style="width: 46px; height: 100%; border: none; background: transparent; color: #999; cursor: pointer; display: flex; align-items: center; justify-content: center;" onmouseover="this.style.background='#e81123';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='#999'"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+        <button id="sc-tb-min" aria-label="Minimize" style="width: 46px; height: 100%; border: none; background: transparent; color: var(--sc-text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center;" onmouseover="this.style.background='var(--sc-surface-raised)'" onmouseout="this.style.background='transparent'"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 18h14"/></svg></button>
+        <button id="sc-tb-max" aria-label="Maximize" style="width: 46px; height: 100%; border: none; background: transparent; color: var(--sc-text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center;" onmouseover="this.style.background='var(--sc-surface-raised)'" onmouseout="this.style.background='transparent'"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="1"/></svg></button>
+        <button id="sc-tb-close" aria-label="Close" style="width: 46px; height: 100%; border: none; background: transparent; color: var(--sc-text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center;" onmouseover="this.style.background='#e81123';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='var(--sc-text-muted)'"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
       </div>
     </div>
   `;

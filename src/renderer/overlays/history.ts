@@ -32,19 +32,19 @@ export function getHistoryOverlayHTML(): string {
       <div class="sc-overlay-group" id="sc-history-stats-section" style="margin-top: 12px;">
         <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;" id="sc-history-stats-toggle">
           <span class="sc-overlay-label" style="margin: 0;">${t('history.statistics')}</span>
-          <span style="color: #888; font-size: 12px;" id="sc-history-stats-arrow"><span data-sc-icon="down"></span></span>
+          <span style="color: var(--sc-text-muted); font-size: 12px;" id="sc-history-stats-arrow"><span data-sc-icon="down"></span></span>
         </div>
         <div id="sc-history-stats-body" style="display: none; margin-top: 12px;">
           <div style="margin-bottom: 16px;">
-            <div style="font-size: 12px; color: #888; margin-bottom: 8px;">${t('history.daily_activity')}</div>
+            <div style="font-size: 12px; color: var(--sc-text-muted); margin-bottom: 8px;">${t('history.daily_activity')}</div>
             <div id="sc-history-chart" style="display: flex; align-items: flex-end; gap: 4px; height: 60px;"></div>
           </div>
           <div style="margin-bottom: 16px;">
-            <div style="font-size: 12px; color: #888; margin-bottom: 8px;">${t('history.top_tracks')}</div>
+            <div style="font-size: 12px; color: var(--sc-text-muted); margin-bottom: 8px;">${t('history.top_tracks')}</div>
             <ul class="sc-overlay-list" id="sc-history-top-tracks"></ul>
           </div>
           <div>
-            <div style="font-size: 12px; color: #888; margin-bottom: 8px;">${t('history.top_artists')}</div>
+            <div style="font-size: 12px; color: var(--sc-text-muted); margin-bottom: 8px;">${t('history.top_artists')}</div>
             <ul class="sc-overlay-list" id="sc-history-top-artists-list"></ul>
           </div>
         </div>
@@ -269,10 +269,10 @@ export function getHistoryOverlayScript(): string {
           return '<li class="sc-overlay-list-item" style="cursor:pointer" data-url="' + window.__scEscapeHtml(info.url || '') + '">' +
             '<div style="flex:1;min-width:0">' +
             '<div class="sc-overlay-list-item-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
-            '<span style="color:#f50;font-weight:700;margin-right:6px;">' + (i + 1) + '</span>' + window.__scEscapeHtml(info.title || '') + '</div>' +
+            '<span style="color:var(--sc-accent);font-weight:700;margin-right:6px;">' + (i + 1) + '</span>' + window.__scEscapeHtml(info.title || '') + '</div>' +
             '<div class="sc-overlay-list-item-sub">' + window.__scEscapeHtml(info.artist || '') + ' &middot; ' + trackCounts[key] + ' ' + _t('history.plays') + '</div>' +
             '</div></li>';
-        }).join('') || '<li style="color:#666;font-size:12px;padding:8px 0;">-</li>';
+        }).join('') || '<li style="color:var(--sc-text-subtle);font-size:12px;padding:8px 0;">-</li>';
 
         topTracksEl.querySelectorAll('.sc-overlay-list-item').forEach(function(item) {
           item.addEventListener('click', function() {
@@ -287,10 +287,10 @@ export function getHistoryOverlayScript(): string {
           return '<li class="sc-overlay-list-item">' +
             '<div style="flex:1;min-width:0">' +
             '<div class="sc-overlay-list-item-title">' +
-              '<span style="color:#f50;font-weight:700;margin-right:6px;">' + (i + 1) + '</span>' + window.__scEscapeHtml(name) + '</div>' +
+              '<span style="color:var(--sc-accent);font-weight:700;margin-right:6px;">' + (i + 1) + '</span>' + window.__scEscapeHtml(name) + '</div>' +
             '<div class="sc-overlay-list-item-sub">' + artists[name] + ' ' + _t('history.plays') + '</div>' +
             '</div></li>';
-        }).join('') || '<li style="color:#666;font-size:12px;padding:8px 0;">-</li>';
+        }).join('') || '<li style="color:var(--sc-text-subtle);font-size:12px;padding:8px 0;">-</li>';
 
         // 7-day activity chart
         var now = new Date();
@@ -307,9 +307,9 @@ export function getHistoryOverlayScript(): string {
         chartEl.innerHTML = dayCounts.map(function(count, i) {
           var pct = Math.round(count / maxDay * 100);
           return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">' +
-            '<div style="font-size:10px;color:#aaa;">' + count + '</div>' +
-            '<div style="width:100%;background:#f50;border-radius:3px;min-height:2px;height:' + Math.max(pct, 4) + '%;opacity:' + (count > 0 ? 1 : 0.2) + ';transition:height 0.3s;"></div>' +
-            '<div style="font-size:9px;color:#666;">' + dayLabels[i] + '</div>' +
+            '<div style="font-size:10px;color:var(--sc-text);">' + count + '</div>' +
+            '<div style="width:100%;background:var(--sc-accent);border-radius:3px;min-height:2px;height:' + Math.max(pct, 4) + '%;opacity:' + (count > 0 ? 1 : 0.2) + ';transition:height 0.3s;"></div>' +
+            '<div style="font-size:9px;color:var(--sc-text-subtle);">' + dayLabels[i] + '</div>' +
             '</div>';
         }).join('');
       }
@@ -354,8 +354,8 @@ export function getHistoryOverlayScript(): string {
         if (existing) { existing.remove(); return; }
         var box = document.createElement('div');
         box.id = 'sc-confirm-clear';
-        box.style.cssText = 'margin-top:8px;padding:10px;background:#2a1a1a;border:1px solid #e74c3c;border-radius:6px;display:flex;align-items:center;justify-content:space-between;';
-        box.innerHTML = '<span style="color:#e74c3c;font-size:12px;">' + _t('history.clear_confirm') + '</span><div style="display:flex;gap:6px;"><button id="sc-confirm-yes" style="background:#e74c3c;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">' + _t('common.yes') + '</button><button id="sc-confirm-no" style="background:#333;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">' + _t('common.no') + '</button></div>';
+        box.style.cssText = 'margin-top:8px;padding:10px;background:var(--sc-danger-soft);border:1px solid var(--sc-danger);border-radius:6px;display:flex;align-items:center;justify-content:space-between;';
+        box.innerHTML = '<span style="color:var(--sc-danger);font-size:12px;">' + _t('history.clear_confirm') + '</span><div style="display:flex;gap:6px;"><button id="sc-confirm-yes" style="background:var(--sc-danger);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">' + _t('common.yes') + '</button><button id="sc-confirm-no" style="background:var(--sc-surface-raised);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">' + _t('common.no') + '</button></div>';
         clearBtn.parentNode.insertBefore(box, clearBtn.nextSibling);
         box.querySelector('#sc-confirm-yes').onclick = function() {
           api.historyClear().then(function() {

@@ -22,7 +22,7 @@ export function getAdblockerOverlayHTML(): string {
             <span id="sc-ad-count">0</span> ${t('adblocker.requests_blocked')}
           </span>
         </div>
-        <div style="font-size: 11px; color: #666; margin-top: 8px;">
+        <div style="font-size: 11px; color: var(--sc-text-subtle); margin-top: 8px;">
           ${t('adblocker.last_updated')}: <span id="sc-ad-last-updated">-</span>
         </div>
       </div>
@@ -114,13 +114,13 @@ export function getAdblockerOverlayScript(): string {
             setTimeout(function() { updateBtn.textContent = _t('adblocker.update_lists'); }, 3000);
           } else {
             updateBtn.textContent = _t('adblocker.update_failed');
-            updateBtn.style.color = '#e74c3c';
+            updateBtn.style.color = 'var(--sc-danger)';
             setTimeout(function() { updateBtn.textContent = _t('adblocker.update_lists'); updateBtn.style.color = ''; }, 3000);
           }
         }).catch(function() {
           updateBtn.disabled = false;
           updateBtn.textContent = _t('adblocker.update_failed');
-          updateBtn.style.color = '#e74c3c';
+          updateBtn.style.color = 'var(--sc-danger)';
           setTimeout(function() { updateBtn.textContent = _t('adblocker.update_lists'); updateBtn.style.color = ''; }, 3000);
         });
       });

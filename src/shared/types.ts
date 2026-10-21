@@ -57,6 +57,17 @@ export interface SidebarBookmark {
   type: 'track' | 'playlist' | 'artist';
 }
 
+export interface MiniPlayerState {
+  title: string;
+  artist: string;
+  artworkUrl: string;
+  isPlaying: boolean;
+  position: number;
+  duration: number;
+  volume: number;
+  trackUrl: string;
+}
+
 export interface StoreSchema {
   language: 'en' | 'ru';
   geoBypass: {
@@ -122,13 +133,9 @@ export interface StoreSchema {
   };
   visualizer: {
     enabled: boolean;
-    type: 'bars' | 'wave' | 'circular';
+    type: 'side' | 'above' | 'wave' | 'glow';
     colorScheme: string;
     version?: number;
-  };
-  crossfade: {
-    enabled: boolean;
-    duration: number;
   };
   sidebar: {
     bookmarks: SidebarBookmark[];
@@ -146,5 +153,8 @@ export interface StoreSchema {
       cachedAt: string;
       fileSize: number;
     }>;
+  };
+  miniPlayer: {
+    bounds: { x: number; y: number } | null;
   };
 }

@@ -1,7 +1,7 @@
-import { app, BrowserWindow, session, globalShortcut, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, session, globalShortcut, ipcMain, shell, screen } from 'electron';
 import path from 'path';
 import fs from 'fs';
-import { spawn } from 'child_process';
+import { spawn, execFile } from 'child_process';
 import { SOUNDCLOUD_URL, WINDOW_CONFIG, IPC_CHANNELS, AD_DOMAINS, AD_CSS_SELECTORS, AD_URL_PATTERNS, CHROME_UA } from '../shared/constants';
 import { applyUserAgentHeaders, UA_SUMMARY } from '../shared/user-agent';
 import { setupIPC, getStore, getEncryptionKey } from './ipc';
@@ -28,6 +28,7 @@ import { getOfflineOverlayHTML, getOfflineOverlayScript } from '../renderer/over
 import { getEqualizerOverlayHTML, getEqualizerOverlayScript } from '../renderer/overlays/equalizer';
 import { getVisualizerScript } from '../renderer/overlays/visualizer';
 import { isSafeExternalUrl, isTrustedOAuthUrl, isTrustedSoundCloudUrl } from '../shared/security';
+import { matchesCombo, resolveKeybinds, type KeybindAction } from '../shared/keybinds';
 
 let mainWindow: BrowserWindow | null = null;
 let splashWindow: BrowserWindow | null = null;
@@ -560,6 +561,7 @@ function getOverlayInitScript(): string {
     { id: 'auth-token', icon: icon('M15 7a4 4 0 1 0-7.2 2.4L4 13.2V17h3v2h3v-2.8l2.4-2.4A4 4 0 0 0 15 7Zm-4 0h.01M16 4l4 4'), label: t('nav.auth_token') },
     { id: 'downloader', icon: icon('M12 3v11M7 10l5 5 5-5M5 20h14'), label: t('nav.downloader') },
     { id: 'history', icon: icon('M4 5.5A2.5 2.5 0 0 1 6.5 3H19v17H6.5A2.5 2.5 0 0 1 4 17.5v-12ZM4 17.5A2.5 2.5 0 0 1 6.5 15H19M8 7h7M8 10h7'), label: t('nav.history') },
+    { id: 'offline-cache', icon: icon('M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9.5a3.5 3.5 0 0 1 .5 6.96M12 12v6m0 0-2.5-2.5M12 18l2.5-2.5'), label: t('nav.offline') },
     { id: 'lyrics', icon: icon('M9 18V6l10-2v12M9 18a3 3 0 1 1-3-3 3 3 0 0 1 3 3Zm10-2a3 3 0 1 1-3-3 3 3 0 0 1 3 3Z'), label: t('nav.lyrics') },
     { id: 'equalizer', icon: icon('<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>'), label: t('nav.equalizer') },
     { id: 'themes', icon: icon('M12 3a9 9 0 1 0 0 18h1.2a1.8 1.8 0 0 0 1.3-3.1 1.8 1.8 0 0 1 1.3-3.1H18a3 3 0 0 0 3-3A8.9 8.9 0 0 0 12 3ZM7 11h.01M8.5 7.5h.01M13 6h.01M17 9h.01'), label: t('nav.themes') },
@@ -818,10 +820,29 @@ function getOverlayInitScript(): string {
         }
       };
 
-      // SoundCloud's volume control is a hidden div[role=slider] that only
-      // reacts to real pointer drags; there is no input[type=range] to nudge.
-      // Drive the slider with a synthetic drag to an exact vertical position.
+      // SoundCloud's sliders are div[role=slider] nodes that only react to
+      // real pointer drags; there is no input[type=range] to nudge. One shared
+      // synthetic press/move/release drives volume and timeline alike.
+      window.__scSliderDrag = function(target, x, y) {
+        var base = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, button: 0 };
+        target.dispatchEvent(new MouseEvent('mousedown', Object.assign({ buttons: 1 }, base)));
+        document.dispatchEvent(new MouseEvent('mousemove', Object.assign({ buttons: 1 }, base)));
+        document.dispatchEvent(new MouseEvent('mouseup', Object.assign({ buttons: 0 }, base)));
+      };
+
       window.__scVolumeStep = function(delta) {
+        try {
+          var wrapper = document.querySelector('.volume__sliderWrapper');
+          if (!wrapper) return false;
+          var current = parseFloat(wrapper.getAttribute('aria-valuenow'));
+          if (!isFinite(current)) current = 0.4;
+          return window.__scPlayerSetVolume(current + (Number(delta) || 0));
+        } catch (e) {
+          return false;
+        }
+      };
+
+      window.__scPlayerSetVolume = function(fraction) {
         try {
           var wrapper = document.querySelector('.volume__sliderWrapper');
           if (!wrapper) return false;
@@ -830,20 +851,105 @@ function getOverlayInitScript(): string {
           var track = wrapper.querySelector('.volume__sliderBackground') || wrapper;
           var rect = track.getBoundingClientRect();
           if (!rect.height) return false;
-          var current = parseFloat(wrapper.getAttribute('aria-valuenow'));
-          if (!isFinite(current)) current = 0.4;
-          var next = Math.max(0, Math.min(1, Math.round((current + delta) * 100) / 100));
+          var next = Math.max(0, Math.min(1, Number(fraction) || 0));
           // The pointer->value mapping is offset ~4px from the painted track
           // (measured against SoundCloud's progress bar); keep that constant.
-          var x = rect.left + rect.width / 2;
-          var y = rect.bottom + 4 - next * rect.height;
-          var base = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, button: 0 };
-          wrapper.dispatchEvent(new MouseEvent('mousedown', Object.assign({ buttons: 1 }, base)));
-          document.dispatchEvent(new MouseEvent('mousemove', Object.assign({ buttons: 1 }, base)));
-          document.dispatchEvent(new MouseEvent('mouseup', Object.assign({ buttons: 0 }, base)));
+          window.__scSliderDrag(
+            wrapper,
+            rect.left + rect.width / 2,
+            rect.bottom + 4 - next * rect.height
+          );
           return true;
         } catch (e) {
           return false;
+        }
+      };
+
+      window.__scPlayerAction = function(action) {
+        var bySelector = function(selector) {
+          var el = document.querySelector(selector);
+          if (!el) return false;
+          el.click();
+          return true;
+        };
+        if (action === 'play-pause') return bySelector('.playControl');
+        if (action === 'next') return bySelector('.playControls__next') || bySelector('.skipControl__next');
+        if (action === 'prev') return bySelector('.playControls__prev') || bySelector('.skipControl__previous');
+        if (action === 'mute') return bySelector('.volume__button');
+        return false;
+      };
+
+      window.__scPlayerSeek = function(fraction) {
+        try {
+          var wrapper = document.querySelector('.playbackTimeline__progressWrapper');
+          if (!wrapper) return false;
+          var rect = wrapper.getBoundingClientRect();
+          if (!rect.width) return false;
+          var next = Math.max(0, Math.min(1, Number(fraction) || 0));
+          window.__scSliderDrag(
+            wrapper,
+            rect.left + rect.width * next,
+            rect.top + rect.height / 2
+          );
+          return true;
+        } catch (e) {
+          return false;
+        }
+      };
+
+      window.__scPlayerSeekBy = function(deltaSeconds) {
+        try {
+          var wrapper = document.querySelector('.playbackTimeline__progressWrapper');
+          if (!wrapper) return false;
+          var current = parseFloat(wrapper.getAttribute('aria-valuenow'));
+          var total = parseFloat(wrapper.getAttribute('aria-valuemax'));
+          if (!isFinite(current) || !isFinite(total) || total <= 0) return false;
+          return window.__scPlayerSeek((current + (Number(deltaSeconds) || 0)) / total);
+        } catch (e) {
+          return false;
+        }
+      };
+
+      // One snapshot for every surface that mirrors playback state (mini
+      // player, media session, integrations). Keeps selector churn in one place.
+      window.__scPlayerState = function() {
+        try {
+          var titleEl = document.querySelector('.playbackSoundBadge__titleLink');
+          var title = titleEl ? (titleEl.getAttribute('title') || titleEl.textContent || '').trim() : '';
+          title = title.replace(/^Current track:\\s*/i, '');
+          var artistEl = document.querySelector('.playbackSoundBadge__lightLink');
+          var artist = artistEl
+            ? (artistEl.getAttribute('title') || artistEl.textContent || '').trim()
+            : '';
+          var artEl = document.querySelector('.playbackSoundBadge__avatar .image__full, .playbackSoundBadge__avatar span[style*="background-image"]');
+          var artworkUrl = '';
+          if (artEl) {
+            var style = artEl.getAttribute('style') || '';
+            var match = style.match(/url\\("?([^"\\)]+)"?\\)/);
+            if (match) artworkUrl = match[1];
+          }
+          var playControl = document.querySelector('.playControl');
+          var isPlaying = playControl ? playControl.classList.contains('playing') : false;
+          var progress = document.querySelector('.playbackTimeline__progressWrapper');
+          var position = progress ? parseFloat(progress.getAttribute('aria-valuenow')) : 0;
+          var duration = progress ? parseFloat(progress.getAttribute('aria-valuemax')) : 0;
+          var volumeEl = document.querySelector('.volume__sliderWrapper');
+          var volume = volumeEl ? parseFloat(volumeEl.getAttribute('aria-valuenow')) : 1;
+          if (!isFinite(position) || position < 0) position = 0;
+          if (!isFinite(duration) || duration < 0) duration = 0;
+          if (!isFinite(volume)) volume = 1;
+          return {
+            title: title,
+            artist: artist,
+            artworkUrl: artworkUrl,
+            isPlaying: isPlaying,
+            position: position,
+            duration: duration,
+            volume: Math.max(0, Math.min(1, volume)),
+            trackUrl: titleEl ? (titleEl.href || '') : ''
+          };
+        } catch (e) {
+          return null;
         }
       };
 
@@ -995,12 +1101,6 @@ function getOverlayInitScript(): string {
           window.__scCloseOverlay();
         }
       });
-
-      if (window.sixteenCloud) {
-        window.sixteenCloud.onOverlayToggle(function() {
-          window.__scToggleOverlay();
-        });
-      }
 
       // Sidebar container (left side, separate)
       if (!document.getElementById('sc-sidebar-container')) {
@@ -1293,15 +1393,24 @@ function registerKeybinds(win: BrowserWindow): void {
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return;
 
-    // Ctrl+B = Sidebar toggle (layout-independent)
-    if (input.code === 'KeyB' && input.control && !input.alt && !input.meta) {
+    const stored = getStore()?.get('settings.keybinds');
+    const binds = resolveKeybinds(stored, process.platform);
+    const match = (action: KeybindAction) => matchesCombo(binds[action], {
+      code: input.code,
+      key: input.key,
+      control: input.control,
+      alt: input.alt,
+      shift: input.shift,
+      meta: input.meta,
+    });
+
+    if (match('sidebar')) {
       event.preventDefault();
       if (!win.isDestroyed()) win.webContents.send(IPC_CHANNELS.SIDEBAR_TOGGLE);
       return;
     }
 
-    // Space = play/pause (when not in text input)
-    if (input.key === ' ' && !input.control && !input.alt && !input.meta && !input.shift) {
+    if (match('playPause')) {
       event.preventDefault();
       win.webContents.executeJavaScript(`
         (function() {
@@ -1321,21 +1430,19 @@ function registerKeybinds(win: BrowserWindow): void {
       return;
     }
 
-    // Ctrl+M = toggle mini player
-    if (input.code === 'KeyM' && input.control && !input.alt && !input.meta && !input.shift) {
+    if (match('miniPlayer')) {
       event.preventDefault();
       toggleMiniPlayer();
       return;
     }
 
-    // Ctrl+Up/Down = SoundCloud's own volume slider
-    if (input.key === 'ArrowUp' && input.control && !input.alt && !input.meta) {
+    if (match('volumeUp')) {
       event.preventDefault();
       win.webContents.executeJavaScript('window.__scVolumeStep && window.__scVolumeStep(0.05)')
         .catch((e: any) => logWarn('volume step error:', e?.message));
       return;
     }
-    if (input.key === 'ArrowDown' && input.control && !input.alt && !input.meta) {
+    if (match('volumeDown')) {
       event.preventDefault();
       win.webContents.executeJavaScript('window.__scVolumeStep && window.__scVolumeStep(-0.05)')
         .catch((e: any) => logWarn('volume step error:', e?.message));
@@ -1346,135 +1453,550 @@ function registerKeybinds(win: BrowserWindow): void {
 
 function getMiniPlayerHTML(): string {
   return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
+<html><head><meta charset="utf-8"><title>SixteenCloud Mini Player</title><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Google+Sans+Text:wght@400;500;700&display=swap" rel="stylesheet"><style>
+:root{--bg:#0f0f10;--fg:#f2f2f4;--muted:#8a8a90;--line:rgba(255,255,255,.07);--accent:#ff5500}
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#111;color:#fff;font-family:'Segoe UI',Inter,-apple-system,sans-serif;overflow:hidden;-webkit-app-region:drag;user-select:none}
-.sc-mini{display:flex;align-items:center;padding:8px 10px;gap:10px;height:80px;position:relative}
-.sc-mini-art{width:60px;height:60px;border-radius:8px;object-fit:cover;background:#222;flex-shrink:0;-webkit-app-region:no-drag}
-.sc-mini-info{flex:1;min-width:0;overflow:hidden}
-.sc-mini-title{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
-.sc-mini-artist{font-size:10px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
-.sc-mini-vol{display:flex;align-items:center;gap:4px;margin-top:5px;-webkit-app-region:no-drag}
-.sc-mini-vol svg{width:12px;height:12px;fill:#888;flex-shrink:0}
-.sc-mini-vol input[type=range]{-webkit-appearance:none;width:70px;height:3px;background:#333;border-radius:2px;outline:none;cursor:pointer}
-.sc-mini-vol input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;border-radius:50%;background:#f50;cursor:pointer}
-.sc-mini-controls{display:flex;gap:2px;flex-shrink:0;-webkit-app-region:no-drag}
-.sc-mini-btn{background:none;border:none;color:#aaa;font-size:14px;cursor:pointer;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all 0.15s;padding:0;line-height:1}
-.sc-mini-btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.sc-mini-btn:hover{background:rgba(255,85,0,0.15);color:#f50}
-.sc-mini-btn.play-btn{color:#f50;font-size:14px}
-.sc-mini-btn.play-btn:hover{background:rgba(255,85,0,0.2);color:#f50}
-.sc-mini-close{position:absolute;top:3px;right:5px;background:none;border:none;color:#555;font-size:11px;cursor:pointer;-webkit-app-region:no-drag;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all 0.15s}
-.sc-mini-close svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
-.sc-mini-close:hover{color:#fff;background:rgba(255,255,255,0.1)}
+html,body{width:100%;height:100%;background:var(--bg);overflow:hidden}
+body{font-family:'Google Sans Text','Google Sans',-apple-system,'Segoe UI',Inter,sans-serif;color:var(--fg);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;user-select:none}
+.card{display:flex;flex-direction:column;width:100%;height:100%;background:var(--bg)}
+.header{position:relative;height:34px;flex-shrink:0;display:flex;align-items:center;padding:0 14px;border-bottom:1px solid rgba(255,255,255,.06);-webkit-app-region:drag}
+.header-title{position:absolute;left:0;right:0;text-align:center;font-size:11px;font-weight:500;letter-spacing:.2px;color:#7d7d84;pointer-events:none}
+.dots{display:flex;gap:8px;align-items:center;z-index:1;-webkit-app-region:no-drag}
+.tl{width:11px;height:11px;border-radius:50%;cursor:pointer;transition:filter .12s}
+.tl:hover{filter:brightness(1.15)}
+.tl-close{background:#ff5f57}
+.tl-min{background:#febc2e}
+.tl-max{background:#28c840}
+.content{display:flex;flex-direction:column;flex:1;min-height:0;padding:10px 14px}
+.top{display:flex;align-items:center;gap:12px;flex:1;min-height:0}
+.art{position:relative;width:56px;height:56px;border-radius:8px;overflow:hidden;flex-shrink:0;background:#1a1a1c;cursor:pointer;-webkit-app-region:no-drag}
+.art img{width:100%;height:100%;object-fit:cover;display:block}
+.ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#4a4a50}
+.ph svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.info{flex:1;min-width:0}
+.title{font-size:13px;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;-webkit-app-region:no-drag}
+.artist{font-size:11px;color:var(--muted);line-height:1.3;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;-webkit-app-region:no-drag}
+.controls{display:flex;align-items:center;gap:2px;flex-shrink:0;-webkit-app-region:no-drag}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;outline:none;padding:0}
+.icon-btn{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#9a9aa0;transition:color .12s,background .12s}
+.icon-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.icon-btn:hover{color:#fff;background:rgba(255,255,255,.06)}
+.play{width:34px;height:34px;border-radius:50%;margin:0 3px;display:flex;align-items:center;justify-content:center;color:#fff;background:var(--accent);transition:background .12s,transform .1s}
+.play svg{width:22px;height:22px;fill:currentColor;stroke:none}
+.play:hover{background:#ff6a1f}
+.play:active{transform:scale(.95)}
+.bottom{display:flex;align-items:center;gap:8px;padding-top:8px;flex-shrink:0}
+.time{font-size:9.5px;color:#77777e;font-variant-numeric:tabular-nums;min-width:26px;text-align:center}
+.prog{flex:1;height:14px;display:flex;align-items:center;cursor:pointer;-webkit-app-region:no-drag;touch-action:none}
+.track{position:relative;width:100%;height:2px;border-radius:1px;background:rgba(255,255,255,.12)}
+.fill{position:absolute;left:0;top:0;height:100%;width:0;border-radius:1px;background:var(--accent)}
+.fill::after{content:'';position:absolute;right:-3px;top:50%;width:6px;height:6px;border-radius:50%;background:#fff;transform:translateY(-50%) scale(0);transition:transform .1s}
+.prog:hover .fill::after,.prog.dragging .fill::after{transform:translateY(-50%) scale(1)}
+.vol{display:flex;align-items:center;gap:6px;flex-shrink:0;-webkit-app-region:no-drag}
+.mute{width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:#8a8a90;transition:color .12s}
+.mute svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.mute:hover{color:#fff}
+.vol input{-webkit-appearance:none;appearance:none;width:60px;height:2px;border-radius:1px;outline:none;cursor:pointer;background:rgba(255,255,255,.12)}
+.vol input::-webkit-slider-thumb{-webkit-appearance:none;width:8px;height:8px;border-radius:50%;background:#fff;border:0}
 </style></head><body>
-<div class="sc-mini">
-  <img class="sc-mini-art" id="art" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><rect fill='%23222' width='60' height='60' rx='8'/></svg>">
-  <div class="sc-mini-info">
-    <div class="sc-mini-title" id="title">SixteenCloud</div>
-    <div class="sc-mini-artist" id="artist">No track playing</div>
-    <div class="sc-mini-vol">
-      <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
-      <input type="range" id="vol" min="0" max="100" value="80">
+<div class="card">
+  <div class="header">
+    <div class="dots">
+      <span class="tl tl-close" id="dotClose" role="button" tabindex="0" aria-label="Закрыть"></span>
+      <span class="tl tl-min" id="dotMin" role="button" tabindex="0" aria-label="Скрыть"></span>
+      <span class="tl tl-max" id="dotMax" role="button" tabindex="0" aria-label="Открыть SixteenCloud"></span>
+    </div>
+    <div class="header-title">Мини-плеер</div>
+  </div>
+  <div class="content">
+  <div class="top">
+    <div class="art" id="art" aria-label="Открыть страницу трека">
+      <div class="ph" id="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg></div>
+      <img id="artImg" alt="" style="display:none">
+    </div>
+    <div class="info">
+      <div class="title" id="title">Ничего не играет</div>
+      <div class="artist" id="artist">Включи трек в SixteenCloud</div>
+    </div>
+    <div class="controls">
+      <button class="icon-btn" id="prev" title="Предыдущий трек" aria-label="Предыдущий трек"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14"/><path d="M19 5 9 12l10 7V5Z"/></svg></button>
+      <button class="play" id="play" title="Играть" aria-label="Играть или пауза"></button>
+      <button class="icon-btn" id="next" title="Следующий трек" aria-label="Следующий трек"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 5v14"/><path d="m5 5 10 7L5 19V5Z"/></svg></button>
     </div>
   </div>
-  <div class="sc-mini-controls">
-    <button class="sc-mini-btn" id="prev" title="Previous"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 6l-8 6 8 6z"/></svg></button>
-    <button class="sc-mini-btn play-btn" id="play" title="Play/Pause"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 10 7-10 7z"/></svg></button>
-    <button class="sc-mini-btn" id="next" title="Next"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M6 6l8 6-8 6z"/></svg></button>
+  <div class="bottom">
+    <div class="time" id="tcur">0:00</div>
+    <div class="prog" id="prog"><div class="track"><div class="fill" id="fill"></div></div></div>
+    <div class="time" id="tdur">0:00</div>
+    <div class="vol">
+      <button class="mute" id="mute" title="Звук" aria-label="Звук"><svg viewBox="0 0 24 24" aria-hidden="true" id="muteIcon"></svg></button>
+      <input type="range" id="vol" min="0" max="100" value="100" aria-label="Громкость">
+    </div>
   </div>
-  <button class="sc-mini-close" id="close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+  </div>
 </div>
 <script>
-  var _debounce = {};
-  function send(action, value) {
-    if (_debounce[action]) return;
-    _debounce[action] = true;
-    window.sixteenCloudMini.sendAction(action, value);
-    setTimeout(function() { _debounce[action] = false; }, action === 'volume' ? 50 : 300);
+  var api = window.sixteenCloudMini;
+  var SPK_ON = '<path d="M4 10v4h3l4 3V7l-4 3H4Z"/><path d="M14.5 9.3a4 4 0 0 1 0 5.4"/><path d="M17.2 6.8a7.5 7.5 0 0 1 0 10.4"/>';
+  var SPK_OFF = '<path d="M4 10v4h3l4 3V7l-4 3H4Z"/><path d="m15.5 9.5 5 5m0-5-5 5"/>';
+  var ICON_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4.5 19 12 7.5 19.5Z"/></svg>';
+  var ICON_PAUSE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4.5h3.4v15H7.5zM13.1 4.5h3.4v15h-3.4z"/></svg>';
+  var $ = function(id) { return document.getElementById(id); };
+  var state = null;
+  var duration = 0;
+  var displayPos = 0;
+  var lastTick = 0;
+  var dragging = false;
+  var dragFrac = 0;
+  var volDragging = false;
+  var pendingSeekUntil = 0;
+  var pendingVolumeUntil = 0;
+  var pendingPlayUntil = 0;
+  var lastVolume = 1;
+  var lastSent = {};
+
+  function send(action, value, force) {
+    var now = Date.now();
+    var gap = action === 'volume' ? 70 : action === 'seek' ? 90 : 160;
+    if (!force && lastSent[action] && now - lastSent[action] < gap) return;
+    lastSent[action] = now;
+    api.sendAction(action, value);
   }
-  document.getElementById('prev').addEventListener('click', function() { send('prev'); });
-  document.getElementById('play').addEventListener('click', function() { send('play-pause'); });
-  document.getElementById('next').addEventListener('click', function() { send('next'); });
-  document.getElementById('close').addEventListener('click', function() { send('close'); });
-  document.getElementById('vol').addEventListener('input', function() { send('volume', parseInt(this.value)); });
-  window.sixteenCloudMini.onUpdate(function(info) {
-    if (info.title) document.getElementById('title').textContent = info.title;
-    if (info.artist) document.getElementById('artist').textContent = info.artist;
-    if (info.artworkUrl) {
-      var img = document.getElementById('art');
-      var url = info.artworkUrl.replace(/-t\\d+x\\d+\\./, '-t200x200.').replace(/-large\\./, '-t200x200.');
-      if (img.src !== url) img.src = url;
+
+  function fmt(seconds) {
+    if (!isFinite(seconds) || seconds < 0) seconds = 0;
+    var m = Math.floor(seconds / 60);
+    var s = Math.floor(seconds % 60);
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function artUrl(url) {
+    if (!url) return '';
+    return String(url)
+      .replace(/-t\\d+x\\d+\\./, '-t200x200.')
+      .replace(/-large\\./, '-t200x200.')
+      .replace(/-(?:mini|small|tiny|badge|original|large)\\./, '-t200x200.');
+  }
+
+  function paintMute(volume) {
+    var muted = volume <= 0.001;
+    $('muteIcon').innerHTML = muted ? SPK_OFF : SPK_ON;
+    $('mute').title = muted ? 'Включить звук' : 'Выключить звук';
+  }
+
+  function paintProgress(position, total) {
+    var pct = total > 0 ? Math.max(0, Math.min(100, (position / total) * 100)) : 0;
+    $('fill').style.width = pct + '%';
+    $('tcur').textContent = fmt(position);
+    $('tdur').textContent = fmt(total);
+  }
+
+  function paintBars() {
+    var total = duration;
+    var pos = dragging ? dragFrac * total : displayPos;
+    paintProgress(pos, total);
+  }
+
+  function paintPlay(isPlaying) {
+    $('play').innerHTML = isPlaying ? ICON_PAUSE : ICON_PLAY;
+    $('play').title = isPlaying ? 'Пауза' : 'Играть';
+    $('play').setAttribute('aria-label', isPlaying ? 'Пауза' : 'Играть');
+  }
+
+  api.onUpdate(function(info) {
+    if (!info) return;
+    var previousTitle = state ? state.title : '';
+    var previousDuration = duration;
+    var now = performance.now();
+    var trackChanged = info.title !== previousTitle || Math.abs((info.duration || 0) - previousDuration) > 0.5;
+
+    state = info;
+    duration = info.duration || 0;
+
+    $('title').textContent = info.title || 'Ничего не играет';
+    $('title').title = info.title || '';
+    $('artist').textContent = info.artist || (info.title ? '' : 'Включи трек в SixteenCloud');
+
+    if (now >= pendingPlayUntil) paintPlay(!!info.isPlaying);
+
+    var url = artUrl(info.artworkUrl);
+    var img = $('artImg');
+    if (url) {
+      if (img.getAttribute('data-src') !== url) {
+        img.setAttribute('data-src', url);
+        img.src = url;
+      }
+      img.style.display = 'block';
+      $('ph').style.display = 'none';
+    } else {
+      img.style.display = 'none';
+      $('ph').style.display = 'flex';
     }
-    var playBtn = document.getElementById('play');
-    playBtn.innerHTML = info.isPlaying
-      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.6 5.5v13M14.4 5.5v13"/></svg>'
-      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 5.6v12.8a1 1 0 0 0 1.53.85l9.2-6.4a1 1 0 0 0 0-1.7L10.03 4.75A1 1 0 0 0 8.5 5.6Z"/></svg>';
+
+    var volume = info.volume == null ? 1 : info.volume;
+    if (volume > 0.01) lastVolume = volume;
+    if (!volDragging && now >= pendingVolumeUntil) {
+      $('vol').value = Math.round(volume * 100);
+      paintMute(volume);
+    } else if (now >= pendingVolumeUntil) {
+      paintMute(volume);
+    }
+
+    if (!dragging && now >= pendingSeekUntil) {
+      var server = info.position || 0;
+      var drift = Math.abs(server - displayPos);
+      if (trackChanged || !info.isPlaying || drift > 1.5) {
+        displayPos = server;
+      }
+    }
+    if (trackChanged) {
+      displayPos = info.position || 0;
+      pendingSeekUntil = 0;
+    }
+
+    lastTick = now;
+    paintBars();
+  });
+
+  function frame(timestamp) {
+    if (!dragging && state && state.isPlaying) {
+      if (!lastTick) lastTick = timestamp;
+      var dt = (timestamp - lastTick) / 1000;
+      if (dt > 0 && dt < 2) displayPos += dt;
+      if (duration > 0) displayPos = Math.min(displayPos, duration);
+      paintBars();
+    }
+    lastTick = timestamp;
+    requestAnimationFrame(frame);
+  }
+  paintPlay(false);
+  paintMute(1);
+  requestAnimationFrame(frame);
+
+  function togglePlayOptimistic() {
+    if (state) {
+      state.isPlaying = !state.isPlaying;
+      paintPlay(!!state.isPlaying);
+      pendingPlayUntil = performance.now() + 1400;
+    }
+    send('play-pause', null, true);
+  }
+
+  function openTrack() {
+    if (state && state.trackUrl) send('open-track', state.trackUrl, true);
+    else send('focus', null, true);
+  }
+
+  $('prev').addEventListener('click', function() { send('prev', null, true); });
+  $('play').addEventListener('click', togglePlayOptimistic);
+  $('next').addEventListener('click', function() { send('next', null, true); });
+  $('mute').addEventListener('click', function() {
+    var current = parseInt($('vol').value, 10) || 0;
+    var next = current > 0 ? 0 : Math.max(1, Math.round(lastVolume * 100));
+    $('vol').value = next;
+    paintMute(next / 100);
+    pendingVolumeUntil = performance.now() + 1800;
+    send('mute', null, true);
+  });
+  $('art').addEventListener('click', openTrack);
+  $('title').addEventListener('click', openTrack);
+  $('artist').addEventListener('click', openTrack);
+  $('dotClose').addEventListener('click', function() { send('close', null, true); });
+  $('dotMin').addEventListener('click', function() { send('hide', null, true); });
+  $('dotMax').addEventListener('click', function() { send('focus', null, true); });
+
+  $('vol').addEventListener('pointerdown', function() { volDragging = true; });
+  $('vol').addEventListener('input', function() {
+    volDragging = true;
+    pendingVolumeUntil = performance.now() + 600;
+    paintMute(parseInt(this.value, 10) / 100);
+    send('volume', parseInt(this.value, 10));
+  });
+  $('vol').addEventListener('change', function() {
+    volDragging = false;
+    pendingVolumeUntil = performance.now() + 700;
+    paintMute(parseInt(this.value, 10) / 100);
+    send('volume', parseInt(this.value, 10), true);
+  });
+  window.addEventListener('pointerup', function() { volDragging = false; });
+
+  var prog = $('prog');
+  function fractionFromEvent(event) {
+    var rect = prog.getBoundingClientRect();
+    if (!rect.width) return 0;
+    return Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  }
+  prog.addEventListener('pointerdown', function(event) {
+    dragging = true;
+    prog.classList.add('dragging');
+    try { prog.setPointerCapture(event.pointerId); } catch (e) {}
+    dragFrac = fractionFromEvent(event);
+    paintBars();
+  });
+  prog.addEventListener('pointermove', function(event) {
+    if (!dragging) return;
+    dragFrac = fractionFromEvent(event);
+    paintBars();
+  });
+  prog.addEventListener('pointerup', function(event) {
+    if (!dragging) return;
+    dragging = false;
+    prog.classList.remove('dragging');
+    var frac = fractionFromEvent(event);
+    if (duration > 0) displayPos = frac * duration;
+    pendingSeekUntil = performance.now() + 2000;
+    paintBars();
+    send('seek', frac, true);
+  });
+  prog.addEventListener('pointercancel', function() {
+    dragging = false;
+    prog.classList.remove('dragging');
+    if (state && !state.isPlaying) displayPos = state.position || displayPos;
+    paintBars();
+  });
+
+  document.addEventListener('keydown', function(event) {
+    if (event.key === ' ') {
+      event.preventDefault();
+      togglePlayOptimistic();
+    } else if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      displayPos = Math.max(0, displayPos - 5);
+      pendingSeekUntil = performance.now() + 2000;
+      paintBars();
+      send('seek-by', -5, true);
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      displayPos = duration > 0 ? Math.min(duration, displayPos + 5) : displayPos + 5;
+      pendingSeekUntil = performance.now() + 2000;
+      paintBars();
+      send('seek-by', 5, true);
+    } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      var step = event.key === 'ArrowUp' ? 5 : -5;
+      var next = Math.max(0, Math.min(100, parseInt($('vol').value, 10) + step));
+      $('vol').value = next;
+      paintMute(next / 100);
+      pendingVolumeUntil = performance.now() + 700;
+      send('volume-step', step, true);
+    } else if (event.key === 'Escape') {
+      send('close', null, true);
+    }
   });
 </script>
 </body></html>`;
 }
 
+const MINI_PLAYER_WIDTH = 400;
+const MINI_PLAYER_HEIGHT = 134;
+const MINI_WINDOW_TITLE = 'SixteenCloud Mini Player';
+
+function pinMiniPlayerOnHyprland(): void {
+  if (process.platform !== 'linux') return;
+  const findAndPin = (attempt: number) => {
+    execFile('hyprctl', ['clients', '-j'], { timeout: 2000 }, (err, stdout) => {
+      if (err) return;
+      let client: { address: string; title: string; pinned: boolean } | undefined;
+      try {
+        client = (JSON.parse(stdout) as Array<{ address: string; title: string; pinned: boolean }>)
+          .find((c) => c.title === MINI_WINDOW_TITLE);
+      } catch { return; }
+      if (!client) {
+        if (attempt < 8) setTimeout(() => findAndPin(attempt + 1), 250);
+        return;
+      }
+      if (client.pinned) return;
+      execFile('hyprctl', ['dispatch', 'pin', `address:${client.address}`], { timeout: 2000 }, (pinErr) => {
+        if (pinErr) logWarn('[MiniPlayer] hyprctl pin failed:', pinErr.message);
+      });
+    });
+  };
+  findAndPin(0);
+}
+
+function miniPlayerPositionIsVisible(x: number, y: number): boolean {
+  return screen.getAllDisplays().some((display) => {
+    const area = display.workArea;
+    return (
+      x + MINI_PLAYER_WIDTH > area.x + 40 &&
+      x < area.x + area.width - 40 &&
+      y + MINI_PLAYER_HEIGHT > area.y + 20 &&
+      y < area.y + area.height - 20
+    );
+  });
+}
+
 function createMiniPlayer(): void {
   if (miniPlayerWindow && !miniPlayerWindow.isDestroyed()) {
+    if (miniPlayerWindow.isMinimized()) miniPlayerWindow.restore();
+    miniPlayerWindow.show();
     miniPlayerWindow.focus();
     return;
   }
+
+  const store = getStore();
+  const saved = store?.get('miniPlayer.bounds') as { x: number; y: number } | null | undefined;
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  let x = typeof saved?.x === 'number'
+    ? saved.x
+    : display.workArea.x + display.workArea.width - MINI_PLAYER_WIDTH - 24;
+  let y = typeof saved?.y === 'number'
+    ? saved.y
+    : display.workArea.y + display.workArea.height - MINI_PLAYER_HEIGHT - 24;
+  if (!miniPlayerPositionIsVisible(x, y)) {
+    x = display.workArea.x + display.workArea.width - MINI_PLAYER_WIDTH - 24;
+    y = display.workArea.y + display.workArea.height - MINI_PLAYER_HEIGHT - 24;
+  }
+
+  lastMiniState = '';
   miniPlayerWindow = new BrowserWindow({
-    width: 340,
-    height: 80,
+    width: MINI_PLAYER_WIDTH,
+    height: MINI_PLAYER_HEIGHT,
+    x,
+    y,
     frame: false,
     alwaysOnTop: true,
     resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
     skipTaskbar: true,
-    transparent: false,
-    backgroundColor: '#111111',
-    title: '',
+    transparent: process.platform !== 'linux',
+    backgroundColor: process.platform === 'linux' ? '#0f0f10' : '#00000000',
+    roundedCorners: false,
+    hasShadow: process.platform === 'darwin',
+    title: MINI_WINDOW_TITLE,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, '../preload/mini-preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      backgroundThrottling: false,
     },
   });
   miniPlayerWindow.setMenu(null);
   miniPlayerWindow.webContents.setUserAgent(CHROME_UA);
+
+  const keepOnTop = () => {
+    if (!miniPlayerWindow || miniPlayerWindow.isDestroyed()) return;
+    try { miniPlayerWindow.setAlwaysOnTop(true, 'screen-saver'); } catch {}
+    try { miniPlayerWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch {}
+  };
+  keepOnTop();
+  miniPlayerWindow.on('show', () => {
+    keepOnTop();
+    pinMiniPlayerOnHyprland();
+  });
+  mainWindow?.on('enter-full-screen', keepOnTop);
+  mainWindow?.on('leave-full-screen', keepOnTop);
+
+  let moveTimer: NodeJS.Timeout | null = null;
+  const saveBounds = () => {
+    if (!miniPlayerWindow || miniPlayerWindow.isDestroyed()) return;
+    const [bx, by] = miniPlayerWindow.getPosition();
+    store?.set('miniPlayer.bounds', { x: bx, y: by });
+  };
+  miniPlayerWindow.on('moved', () => {
+    if (moveTimer) clearTimeout(moveTimer);
+    moveTimer = setTimeout(saveBounds, 350);
+  });
+  miniPlayerWindow.on('close', saveBounds);
 
   // Write HTML to temp file — data: URLs break nodeIntegration IPC
   const tmpDir = app.getPath('temp');
   const miniHtmlPath = path.join(tmpDir, 'sc-mini-player.html');
   fs.writeFileSync(miniHtmlPath, getMiniPlayerHTML(), 'utf-8');
   miniPlayerWindow.loadFile(miniHtmlPath);
+  miniPlayerWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    logWarn('[MiniPlayer] load failed:', code, desc, url);
+  });
+  miniPlayerWindow.once('ready-to-show', () => {
+    if (!miniPlayerWindow || miniPlayerWindow.isDestroyed()) return;
+    miniPlayerWindow.show();
+    pinMiniPlayerOnHyprland();
+  });
 
   // Listen for IPC from mini-player and forward actions to main window
-  const miniIpcHandler = (event: Electron.IpcMainEvent, action: string, value?: any) => {
+  const miniIpcHandler = (event: Electron.IpcMainEvent, action: string, value?: number | string) => {
     if (!miniPlayerWindow || event.sender !== miniPlayerWindow.webContents) return;
     if (!mainWindow || mainWindow.isDestroyed()) return;
-    if (action === 'play-pause') {
-      mainWindow.webContents.executeJavaScript(`document.querySelector('.playControl')?.click();`).catch(() => {});
-    } else if (action === 'prev') {
-      mainWindow.webContents.executeJavaScript(`document.querySelector('.skipControl__previous')?.click();`).catch(() => {});
-    } else if (action === 'next') {
-      mainWindow.webContents.executeJavaScript(`document.querySelector('.skipControl__next')?.click();`).catch(() => {});
-    } else if (action === 'volume') {
-      const v = Math.max(0, Math.min(100, Number(value) || 0));
-      mainWindow.webContents.executeJavaScript(`
-        (function(){
-          var v = document.querySelector('.volume__sliderWrapper input[type="range"]');
-          if (v) { var set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set; set.call(v, ${v}); v.dispatchEvent(new Event('input',{bubbles:true})); }
-        })();
-      `).catch(() => {});
-    } else if (action === 'close') {
-      if (miniPlayerWindow && !miniPlayerWindow.isDestroyed()) {
-        miniPlayerWindow.close();
-        miniPlayerWindow = null;
+    const run = (script: string) => {
+      mainWindow!.webContents.executeJavaScript(script).catch(() => {});
+    };
+    const refresh = () => {
+      setTimeout(pushMiniPlayerState, 120);
+      setTimeout(pushMiniPlayerState, 900);
+    };
+    switch (action) {
+      case 'play-pause':
+        run(`window.__scPlayerAction && window.__scPlayerAction('play-pause')`);
+        break;
+      case 'prev':
+        run(`window.__scPlayerAction && window.__scPlayerAction('prev')`);
+        break;
+      case 'next':
+        run(`window.__scPlayerAction && window.__scPlayerAction('next')`);
+        break;
+      case 'mute':
+        run(`window.__scPlayerAction && window.__scPlayerAction('mute')`);
+        break;
+      case 'volume': {
+        const fraction = Math.max(0, Math.min(1, (Number(value) || 0) / 100));
+        run(`window.__scPlayerSetVolume && window.__scPlayerSetVolume(${fraction})`);
+        break;
       }
+      case 'volume-step': {
+        const delta = Math.max(-1, Math.min(1, (Number(value) || 0) / 100));
+        run(`window.__scVolumeStep && window.__scVolumeStep(${delta})`);
+        break;
+      }
+      case 'seek': {
+        const fraction = Math.max(0, Math.min(1, Number(value) || 0));
+        run(`window.__scPlayerSeek && window.__scPlayerSeek(${fraction})`);
+        break;
+      }
+      case 'seek-by': {
+        const seconds = Math.max(-3600, Math.min(3600, Number(value) || 0));
+        run(`window.__scPlayerSeekBy && window.__scPlayerSeekBy(${seconds})`);
+        break;
+      }
+      case 'hide':
+        if (miniPlayerWindow && !miniPlayerWindow.isDestroyed()) miniPlayerWindow.hide();
+        break;
+      case 'open-track': {
+        const url = typeof value === 'string' ? value : '';
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+        if (/^https?:\/\//i.test(url)) {
+          run(`window.__scNavigate && window.__scNavigate(${JSON.stringify(url)})`);
+        }
+        break;
+      }
+      case 'focus':
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+        break;
+      case 'close':
+        if (miniPlayerWindow && !miniPlayerWindow.isDestroyed()) miniPlayerWindow.close();
+        miniPlayerWindow = null;
+        break;
     }
+    if (action !== 'close' && action !== 'focus' && action !== 'hide') refresh();
   };
   ipcMain.on('mini:action', miniIpcHandler);
+  miniPlayerWindow.webContents.on('did-finish-load', () => pushMiniPlayerState());
 
+  miniPlayerWindow.webContents.on('render-process-gone', (_e, details) => {
+    logWarn('[MiniPlayer] renderer gone:', details.reason, details.exitCode);
+  });
+  miniPlayerWindow.on('unresponsive', () => logWarn('[MiniPlayer] unresponsive'));
   miniPlayerWindow.on('closed', () => {
+    logInfo('[MiniPlayer] window closed');
     miniPlayerWindow = null;
+    lastMiniState = '';
     ipcMain.removeListener('mini:action', miniIpcHandler);
   });
 }
@@ -1488,34 +2010,30 @@ function toggleMiniPlayer(): void {
   }
 }
 
-function syncMiniPlayerTrackInfo(win: BrowserWindow): void {
-  setInterval(() => {
+let miniSyncTimer: NodeJS.Timeout | null = null;
+let lastMiniState = '';
+
+function pushMiniPlayerState(): void {
+  if (!miniPlayerWindow || miniPlayerWindow.isDestroyed()) return;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.executeJavaScript(
+    `(function() {
+      try { return window.__scPlayerState ? JSON.stringify(window.__scPlayerState()) : null; }
+      catch (e) { return null; }
+    })()`
+  ).then((raw: unknown) => {
+    if (typeof raw !== 'string' || raw === lastMiniState) return;
+    lastMiniState = raw;
     if (!miniPlayerWindow || miniPlayerWindow.isDestroyed()) return;
-    if (win.isDestroyed()) return;
-    win.webContents.executeJavaScript(`
-      (function() {
-        var titleEl = document.querySelector('.playbackSoundBadge__titleLink');
-        var artistEl = document.querySelector('.playbackSoundBadge__lightLink');
-        if (!titleEl) return null;
-        var title = titleEl.getAttribute('title') || titleEl.textContent.trim();
-        var artist = artistEl ? (artistEl.getAttribute('title') || artistEl.textContent.trim()) : '';
-        var artEl = document.querySelector('.playbackSoundBadge__avatar .image__full, .playbackSoundBadge__avatar span[style*="background-image"]');
-        var artworkUrl = '';
-        if (artEl) {
-          var style = artEl.getAttribute('style') || '';
-          var m = style.match(/url\\("?([^"\\)]+)"?\\)/);
-          if (m) artworkUrl = m[1];
-        }
-        var pc = document.querySelector('.playControl');
-        var isPlaying = pc ? pc.classList.contains('playing') : false;
-        return { title: title, artist: artist, artworkUrl: artworkUrl, isPlaying: isPlaying };
-      })();
-    `).then((info: any) => {
-      if (info && miniPlayerWindow && !miniPlayerWindow.isDestroyed()) {
-        miniPlayerWindow.webContents.send(IPC_CHANNELS.MINI_PLAYER_UPDATE, info);
-      }
-    }).catch(() => {});
-  }, 4000);
+    try {
+      miniPlayerWindow.webContents.send(IPC_CHANNELS.MINI_PLAYER_UPDATE, JSON.parse(raw));
+    } catch { /* window went away mid-flight */ }
+  }).catch(() => {});
+}
+
+function syncMiniPlayerTrackInfo(): void {
+  if (miniSyncTimer) return;
+  miniSyncTimer = setInterval(pushMiniPlayerState, 1000);
 }
 
 function registerMediaKeys(win: BrowserWindow): void {
@@ -1679,7 +2197,42 @@ if (!gotLock) {
   });
 }
 
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self' https: data: blob:",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:",
+  "style-src 'self' 'unsafe-inline' https:",
+  "img-src 'self' https: data: blob:",
+  "media-src 'self' https: data: blob:",
+  "font-src 'self' https: data:",
+  "connect-src 'self' https: wss: data: blob:",
+  "frame-src https:",
+  "worker-src 'self' https: blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self' https:",
+].join('; ');
+
+// SoundCloud ships its own CSP on some responses; never weaken or duplicate it.
+function applyContentSecurityPolicy(): void {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const headers = details.responseHeaders || {};
+    const existing = Object.keys(headers).find(name => name.toLowerCase() === 'content-security-policy');
+    if (existing) {
+      callback({ responseHeaders: headers });
+      return;
+    }
+    callback({
+      responseHeaders: {
+        ...headers,
+        'Content-Security-Policy': [CONTENT_SECURITY_POLICY],
+      },
+    });
+  });
+}
+
 app.whenReady().then(() => {
+  applyContentSecurityPolicy();
+
   // Splash screen
   const splashPath = path.join(__dirname, '../../src/renderer/splash.html');
   logInfo('[SixteenCloud] Splash path:', splashPath);
@@ -1732,17 +2285,13 @@ app.whenReady().then(() => {
     handleDeepLink(deepLinkUrl);
   }
 
-  // Mini-player close handler
-  ipcMain.on(IPC_CHANNELS.MINI_PLAYER_CLOSE, (event) => {
-    if (!miniPlayerWindow || event.sender !== miniPlayerWindow.webContents) return;
-    if (miniPlayerWindow && !miniPlayerWindow.isDestroyed()) {
-      miniPlayerWindow.close();
-      miniPlayerWindow = null;
-    }
+  // Mini-player toggle from renderer (window.sixteenCloud.miniPlayerToggle)
+  ipcMain.on(IPC_CHANNELS.MINI_PLAYER_TOGGLE, () => {
+    toggleMiniPlayer();
   });
 
   // Start mini-player track sync
-  syncMiniPlayerTrackInfo(mainWindow);
+  syncMiniPlayerTrackInfo();
 
   // Inject media session and titlebar after page loads
   mainWindow.webContents.on('did-finish-load', () => {

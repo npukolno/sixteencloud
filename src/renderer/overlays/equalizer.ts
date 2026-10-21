@@ -129,12 +129,12 @@ export function getEqualizerOverlayScript(): string {
           window.__scEqFilters = filters;
           filtersConnected = true;
           statusEl.textContent = _t('eq.active');
-          statusEl.style.color = '#2ecc71';
+          statusEl.style.color = 'var(--sc-success)';
           return true;
         } catch(e) {
           console.log('[EQ] Setup error:', e);
           statusEl.textContent = 'Error: ' + e.message;
-          statusEl.style.color = '#e74c3c';
+          statusEl.style.color = 'var(--sc-danger)';
           return false;
         }
       }
@@ -178,7 +178,7 @@ export function getEqualizerOverlayScript(): string {
       function trySetup() {
         if (!setupFilters()) {
           statusEl.textContent = _t('eq.waiting');
-          statusEl.style.color = '#f39c12';
+          statusEl.style.color = 'var(--sc-warning)';
           setTimeout(trySetup, 2000);
           return;
         }
@@ -188,8 +188,8 @@ export function getEqualizerOverlayScript(): string {
       function renderCustomPresets() {
         var html = '';
         for (var name in customPresets) {
-          html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #222">' +
-            '<span style="color:#ddd;font-size:13px;cursor:pointer" class="sc-eq-custom-apply" data-name="' + window.__scEscapeHtml(name) + '">' + window.__scEscapeHtml(name) + '</span>' +
+          html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--sc-border)">' +
+            '<span style="color:var(--sc-text);font-size:13px;cursor:pointer" class="sc-eq-custom-apply" data-name="' + window.__scEscapeHtml(name) + '">' + window.__scEscapeHtml(name) + '</span>' +
             '<button class="sc-overlay-btn-icon sc-eq-custom-del" data-name="' + window.__scEscapeHtml(name) + '" style="font-size:14px" data-sc-icon="x" aria-label="Remove"></button></div>';
         }
         customContainer.innerHTML = html;

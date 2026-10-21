@@ -22,11 +22,6 @@ try {
 }
 
 const api = {
-  // Overlay
-  onOverlayToggle: (callback: (overlayId: string) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.OVERLAY_TOGGLE, (_event, overlayId: string) => callback(overlayId));
-  },
-
   // Store
   storeGet: (key: string): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.STORE_GET, key),
   storeSet: (key: string, value: unknown): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.STORE_SET, key, value),

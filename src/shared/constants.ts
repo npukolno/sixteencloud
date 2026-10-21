@@ -192,10 +192,6 @@ export const STORE_DEFAULTS = {
   customCss: {
     code: '',
   },
-  crossfade: {
-    enabled: false,
-    duration: 5,
-  },
   equalizer: {
     enabled: false,
     preset: 'flat',
@@ -217,10 +213,12 @@ export const STORE_DEFAULTS = {
     maxSizeMB: 500,
     tracks: [] as Array<{ trackId: string; title: string; artist: string; artworkUrl: string; duration: number; cachedAt: string; fileSize: number }>,
   },
+  miniPlayer: {
+    bounds: null as { x: number; y: number } | null,
+  },
 };
 
 export const IPC_CHANNELS = {
-  OVERLAY_TOGGLE: 'overlay:toggle',
   OVERLAY_CLOSE: 'overlay:close',
   STORE_GET: 'store:get',
   STORE_SET: 'store:set',
@@ -277,5 +275,4 @@ export const IPC_CHANNELS = {
   OFFLINE_CACHE_STATUS: 'offline:status',
   MINI_PLAYER_TOGGLE: 'mini:toggle',
   MINI_PLAYER_UPDATE: 'mini:update',
-  MINI_PLAYER_CLOSE: 'mini:close',
 } as const;

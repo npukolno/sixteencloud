@@ -17,8 +17,8 @@ export function getLyricsOverlayHTML(): string {
       <div class="sc-overlay-group">
         <span class="sc-overlay-label">${t('lyrics.font_size')}</span>
         <div style="display: flex; align-items: center; gap: 10px;">
-          <input type="range" min="12" max="28" value="16" id="sc-lyrics-fontsize" style="flex:1; accent-color: #f50;">
-          <span id="sc-lyrics-fontsize-val" style="color: #888; font-size: 12px; min-width: 30px;">16px</span>
+          <input type="range" min="12" max="28" value="16" id="sc-lyrics-fontsize" style="flex:1; accent-color: var(--sc-accent);">
+          <span id="sc-lyrics-fontsize-val" style="color: var(--sc-text-muted); font-size: 12px; min-width: 30px;">16px</span>
         </div>
       </div>
 
@@ -272,7 +272,7 @@ export function getLyricsOverlayScript(): string {
         dot.className = 'sc-overlay-status-dot yellow';
         trackText.textContent = title + ' — ' + artist;
         clearModes();
-        content.innerHTML = '<div style="color:#888;text-align:center;padding:40px 0">' + _t('lyrics.searching') + '</div>';
+        content.innerHTML = '<div style="color:var(--sc-text-muted);text-align:center;padding:40px 0">' + _t('lyrics.searching') + '</div>';
 
         var au = window.__scAudioElement;
         var dur = (au && isFinite(au.duration) && au.duration > 1) ? au.duration : undefined;
@@ -281,7 +281,7 @@ export function getLyricsOverlayScript(): string {
           if (seq !== fetchSeq) return;
           if (!result || !result.lyrics) {
             dot.className = 'sc-overlay-status-dot red';
-            content.innerHTML = '<div style="color:#666;text-align:center;padding:40px 0">' + _t('lyrics.not_found') + '</div>';
+            content.innerHTML = '<div style="color:var(--sc-text-subtle);text-align:center;padding:40px 0">' + _t('lyrics.not_found') + '</div>';
             return;
           }
           var lines = result.syncedLyrics ? parseLrc(result.syncedLyrics) : null;
@@ -295,7 +295,7 @@ export function getLyricsOverlayScript(): string {
         }).catch(function() {
           if (seq !== fetchSeq) return;
           dot.className = 'sc-overlay-status-dot red';
-          content.innerHTML = '<div style="color:#666;text-align:center;padding:40px 0">' + _t('lyrics.fetch_failed') + '</div>';
+          content.innerHTML = '<div style="color:var(--sc-text-subtle);text-align:center;padding:40px 0">' + _t('lyrics.fetch_failed') + '</div>';
         });
       }
 

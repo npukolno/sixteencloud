@@ -57,7 +57,7 @@ SixteenCloud wraps the SoundCloud web player in Electron and adds the parts a mu
 - **Themes & accents** — accent color, dark/light, custom CSS.
 - **Geo-unblock** — optional proxy routing for region-locked catalogs.
 - **History** — locally stored listening history with search.
-- **Auto-update** — signed Windows installer and AppImage builds check GitHub Releases.
+- **Auto-update** — Windows and AppImage builds check GitHub Releases (Windows builds are unsigned, so SmartScreen warns before the first run).
 
 ## Install
 
