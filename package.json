@@ -1,6 +1,6 @@
 {
   "name": "sixteencloud",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "SixteenCloud",
   "desktopName": "SixteenCloud",
   "homepage": "https://ocb2016.me",
@@ -111,6 +111,10 @@
       "installerHeader": "assets/installer-header.bmp",
       "deleteAppDataOnUninstall": false,
       "shortcutName": "SixteenCloud"
+    },
+    "npmRebuild": false,
+    "mac": {
+      "icon": "assets/icons/icon-1024.png"
     }
   }
 }
