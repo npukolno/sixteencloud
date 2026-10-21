@@ -6,6 +6,15 @@ const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5 MB
 const TRUNCATE_TO = 2 * 1024 * 1024; // 2 MB
 
 let logFilePath: string | null = null;
+let consoleUsable = true;
+
+// stdout/stderr can disappear when the launching terminal or service closes
+// (write EIO). A dying console must never take the main process down with it.
+for (const stream of [process.stdout, process.stderr]) {
+  stream?.on?.('error', () => {
+    consoleUsable = false;
+  });
+}
 
 function getLogFilePath(): string {
   if (logFilePath) return logFilePath;
@@ -49,8 +58,14 @@ export function log(level: string, ...args: any[]): void {
     .join(' ');
   const line = `[${timestamp}] [${level.toUpperCase()}] ${message}\n`;
 
-  // Always mirror to console
-  console.log(line.trimEnd());
+  // Always mirror to console, unless the stream already failed
+  if (consoleUsable) {
+    try {
+      console.log(line.trimEnd());
+    } catch {
+      consoleUsable = false;
+    }
+  }
 
   try {
     const filePath = getLogFilePath();
