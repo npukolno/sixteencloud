@@ -104,30 +104,12 @@ export function getThemesOverlayScript(): string {
         return candidate;
       }
 
-      function toRgba(color, alpha) {
-        var hex = normalizeColor(color, '#ff5500').slice(1);
-        var value = parseInt(hex.slice(0, 6), 16);
-        return 'rgba(' + ((value >> 16) & 255) + ',' + ((value >> 8) & 255) + ',' + (value & 255) + ',' + alpha + ')';
-      }
-
-      function toRgb(color) {
-        var hex = normalizeColor(color, '#ff5500').slice(1);
-        var value = parseInt(hex.slice(0, 6), 16);
-        return ((value >> 16) & 255) + ',' + ((value >> 8) & 255) + ',' + (value & 255);
-      }
-
-      function contrastColor(color) {
-        var hex = normalizeColor(color, '#ff5500').slice(1);
-        var value = parseInt(hex.slice(0, 6), 16);
-        var r = (value >> 16) & 255, g = (value >> 8) & 255, b = value & 255;
-        return (r * 299 + g * 587 + b * 114) >= 150000 ? '#111111' : '#ffffff';
-      }
-
-      // Generate full CSS from color palette
-      function genCSS(bg, surface, accent, text, border, secondary) {
+      // Generate full CSS from the theme's surface palette. The accent is
+      // deliberately NOT emitted here: settings.accentColor owns --sc-accent
+      // app-wide, so themes and the accent picker never fight each other.
+      function genCSS(bg, surface, _accent, text, border, secondary) {
         bg = normalizeColor(bg, '#101114');
         surface = normalizeColor(surface, '#17191e');
-        accent = normalizeColor(accent, '#ff5500');
         text = normalizeColor(text, '#f4f5f7');
         border = normalizeColor(border, '#343840');
         secondary = normalizeColor(secondary, '#a0a5af');
@@ -135,7 +117,7 @@ export function getThemesOverlayScript(): string {
         var bgR = (bgValue >> 16) & 255, bgG = (bgValue >> 8) & 255, bgB = bgValue & 255;
         var isDark = (bgR * 299 + bgG * 587 + bgB * 114) < 140000;
         return [
-          ':root{--sc-bg:'+bg+';--sc-surface:'+surface+';--sc-surface-raised:'+surface+';--sc-border:'+border+';--sc-border-strong:'+border+';--sc-text:'+text+';--sc-text-muted:'+secondary+';--sc-text-subtle:'+secondary+';--sc-accent:'+accent+';--sc-accent-rgb:'+toRgb(accent)+';--sc-accent-foreground:'+contrastColor(accent)+';--sc-accent-hover:'+accent+';--sc-focus:'+toRgba(accent, 0.3)+';} ',
+          ':root{--sc-bg:'+bg+';--sc-surface:'+surface+';--sc-surface-raised:'+surface+';--sc-border:'+border+';--sc-border-strong:'+border+';--sc-text:'+text+';--sc-text-muted:'+secondary+';--sc-text-subtle:'+secondary+';} ',
           '#sc-overlay-container .sc-overlay-window,#sc-sidebar-container .sc-sidebar-panel{background:'+bg+' !important;color:'+text+' !important;border-color:'+border+' !important;}',
           '#sc-overlay-container .sc-overlay-nav{background:'+surface+' !important;border-color:'+border+' !important;}',
           '#sc-overlay-container .sc-overlay-content,#sc-overlay-container .sc-overlay-panel{background:'+bg+' !important;color:'+text+' !important;}',
@@ -145,12 +127,12 @@ export function getThemesOverlayScript(): string {
           '#sc-overlay-container .sc-overlay-toggle-label,#sc-overlay-container .sc-overlay-list-item-title{color:'+text+' !important;}',
           '#sc-overlay-container .sc-overlay-label,#sc-overlay-container .sc-overlay-hint,#sc-overlay-container .sc-overlay-list-item-sub{color:'+secondary+' !important;}',
           '#sc-overlay-container .sc-overlay-btn-secondary{background:'+surface+' !important;color:'+text+' !important;border:1px solid '+border+' !important;}',
-          '#sc-overlay-container .sc-overlay-btn-primary{background:'+accent+' !important;border-color:'+accent+' !important;}',
-          '#sc-overlay-container .sc-overlay-switch input:checked + .sc-overlay-switch-slider{background:'+accent+' !important;}',
-          '#sc-overlay-container .sc-overlay-badge{background:'+toRgba(accent, 0.2)+' !important;color:'+accent+' !important;}',
-          '#sc-overlay-container .sc-overlay-progress-bar{background:'+accent+' !important;}',
+          '#sc-overlay-container .sc-overlay-btn-primary{background:var(--sc-accent) !important;border-color:var(--sc-accent) !important;}',
+          '#sc-overlay-container .sc-overlay-switch input:checked + .sc-overlay-switch-slider{background:var(--sc-accent) !important;}',
+          '#sc-overlay-container .sc-overlay-badge{background:rgba(var(--sc-accent-rgb), 0.2) !important;color:var(--sc-accent) !important;}',
+          '#sc-overlay-container .sc-overlay-progress-bar{background:var(--sc-accent) !important;}',
           '#sc-overlay-container .sc-overlay-user-card,#sc-overlay-container .sc-overlay-status,#sc-overlay-container .sc-eq-bands,#sc-overlay-container .sc-theme-card,#sc-overlay-container #sc-theme-editor{background:'+surface+' !important;color:'+text+' !important;border-color:'+border+' !important;}',
-          '#sc-overlay-container .sc-theme-card.active{border-color:'+accent+' !important;}',
+          '#sc-overlay-container .sc-theme-card.active{border-color:var(--sc-accent) !important;}',
           '#sc-overlay-container .sc-overlay-user-name,#sc-overlay-container .sc-overlay-download-title,#sc-overlay-container .sc-overlay-list-item-title,#sc-overlay-container #sc-discord-preview-app,#sc-overlay-container #sc-discord-preview-title{color:'+text+' !important;}',
           '#sc-overlay-container .sc-overlay-user-id,#sc-overlay-container .sc-overlay-download-artist,#sc-overlay-container .sc-overlay-list-item-sub,#sc-overlay-container #sc-discord-preview-artist,#sc-overlay-container #sc-discord-preview-time{color:'+secondary+' !important;}',
           '#sc-overlay-container .sc-overlay-download-item,#sc-overlay-container .sc-overlay-list-item,#sc-overlay-container .sc-overlay-section{border-color:'+border+' !important;}',
@@ -215,7 +197,7 @@ export function getThemesOverlayScript(): string {
           '.audibleTile__mainHeading a,',
           '.selectionCard__title a,',
           '.sc-link-primary:visited{',
-          '  color:'+accent+' !important;',
+          '  color:var(--sc-accent) !important;',
           '}',
           // Primary text
           '.sc-type-medium,.sc-type-small,.sc-font-body,',
@@ -258,7 +240,7 @@ export function getThemesOverlayScript(): string {
           '  border-bottom-color:'+border+' !important;',
           '}',
           '.g-tabs-link{border-bottom-color:transparent !important;}',
-          '.g-tabs-link.active{border-bottom-color:'+accent+' !important;}',
+          '.g-tabs-link.active{border-bottom-color:var(--sc-accent) !important;}',
           // Buttons
           '.sc-button,.sc-button-medium,.sc-button-small,.sc-button-responsive{',
           '  background-color:'+surface+' !important;',
@@ -266,9 +248,9 @@ export function getThemesOverlayScript(): string {
           '  color:'+text+' !important;',
           '}',
           '.sc-button-cta{',
-          '  background-color:'+accent+' !important;',
-          '  border-color:'+accent+' !important;',
-          '  color:#fff !important;',
+          '  background-color:var(--sc-accent) !important;',
+          '  border-color:var(--sc-accent) !important;',
+          '  color:var(--sc-accent-foreground, #fff) !important;',
           '}',
           // Inputs
           'input,textarea,select,.textfield__input{',
@@ -284,7 +266,7 @@ export function getThemesOverlayScript(): string {
           '  background-color:'+border+' !important;',
           '}',
           '.playbackTimeline__progressWrapper .sc-ir{',
-          '  background-color:'+accent+' !important;',
+          '  background-color:var(--sc-accent) !important;',
           '}',
           // Queue/Next Up popup
           '.queueFallback,.queue__panel,.queue__itemWrapper,.queue__itemDetails,',

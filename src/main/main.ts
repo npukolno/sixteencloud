@@ -561,7 +561,7 @@ function getOverlayInitScript(): string {
     { id: 'auth-token', icon: icon('M15 7a4 4 0 1 0-7.2 2.4L4 13.2V17h3v2h3v-2.8l2.4-2.4A4 4 0 0 0 15 7Zm-4 0h.01M16 4l4 4'), label: t('nav.auth_token') },
     { id: 'downloader', icon: icon('M12 3v11M7 10l5 5 5-5M5 20h14'), label: t('nav.downloader') },
     { id: 'history', icon: icon('M4 5.5A2.5 2.5 0 0 1 6.5 3H19v17H6.5A2.5 2.5 0 0 1 4 17.5v-12ZM4 17.5A2.5 2.5 0 0 1 6.5 15H19M8 7h7M8 10h7'), label: t('nav.history') },
-    { id: 'offline-cache', icon: icon('M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9.5a3.5 3.5 0 0 1 .5 6.96M12 12v6m0 0-2.5-2.5M12 18l2.5-2.5'), label: t('nav.offline') },
+    { id: 'offline-cache', icon: icon('<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"><path d="M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9.5a3.5 3.5 0 0 1 .5 6.96"/><path d="M12 12v6m0 0-2.5-2.5M12 18l2.5-2.5"/></g>'), label: t('nav.offline') },
     { id: 'lyrics', icon: icon('M9 18V6l10-2v12M9 18a3 3 0 1 1-3-3 3 3 0 0 1 3 3Zm10-2a3 3 0 1 1-3-3 3 3 0 0 1 3 3Z'), label: t('nav.lyrics') },
     { id: 'equalizer', icon: icon('<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>'), label: t('nav.equalizer') },
     { id: 'themes', icon: icon('M12 3a9 9 0 1 0 0 18h1.2a1.8 1.8 0 0 0 1.3-3.1 1.8 1.8 0 0 1 1.3-3.1H18a3 3 0 0 0 3-3A8.9 8.9 0 0 0 12 3ZM7 11h.01M8.5 7.5h.01M13 6h.01M17 9h.01'), label: t('nav.themes') },
