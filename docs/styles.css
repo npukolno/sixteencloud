@@ -1327,3 +1327,42 @@ button {
     transform: none;
   }
 }
+
+/* Screenshot lightbox */
+.screen-shot { cursor: zoom-in; }
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 8, 10, 0.92);
+  cursor: zoom-out;
+}
+.lightbox[hidden] { display: none; }
+.lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.6);
+  cursor: default;
+}
+.lightbox-close {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+.lightbox-close:hover { border-color: var(--accent); color: var(--accent-soft); }
+body.lightbox-open { overflow: hidden; }
