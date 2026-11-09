@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '../shared/constants';
 import { installAudioHook } from './audio-hook';
 import { installFingerprintAlignment } from './fingerprint';
+import { installApiTap } from './api-tap';
 
 // Install the audio graph hook in the page's main world before SoundCloud
 // scripts run. Must happen from preload — page code may create its
@@ -19,6 +20,13 @@ try {
   contextBridge.executeInMainWorld({ func: installFingerprintAlignment });
 } catch (e) {
   console.warn('[SixteenCloud] fingerprint alignment injection failed:', e);
+}
+
+// Passive tap on SoundCloud's own API responses (track flags, catalog).
+try {
+  contextBridge.executeInMainWorld({ func: installApiTap });
+} catch (e) {
+  console.warn('[SixteenCloud] api tap injection failed:', e);
 }
 
 const api = {
@@ -98,6 +106,10 @@ const api = {
   historySearch: (query: string): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.HISTORY_SEARCH, query),
 
   // Lyrics (duration in seconds sharpens source matching when known)
+  lyricsCandidates: (artist: string, title: string, duration?: number, query?: string): Promise<unknown> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LYRICS_CANDIDATES, artist, title, duration, query),
+  lyricsPref: (action: string, key: string, value?: unknown): Promise<unknown> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LYRICS_PREF, action, key, value),
   lyricsFetch: (artist: string, title: string, duration?: number): Promise<unknown> =>
     ipcRenderer.invoke(IPC_CHANNELS.LYRICS_FETCH, artist, title, duration),
 
@@ -123,6 +135,16 @@ const api = {
   onUpdaterProgress: (callback: (progress: { percent: number }) => void) => {
     ipcRenderer.on(IPC_CHANNELS.UPDATER_PROGRESS, (_event, progress) => callback(progress));
   },
+
+  // Player extras
+  notifyTrack: (info: { title: string; artist: string; artwork?: string }): void =>
+    ipcRenderer.send(IPC_CHANNELS.NOTIFY_TRACK, info),
+  scrobbleSetToken: (token: string): Promise<{ success: boolean; user?: string; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SCROBBLE_TOKEN, token),
+  scrobbleStatus: (): Promise<{ hasToken: boolean; user?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SCROBBLE_STATUS),
+  scrobbleSubmit: (entry: { kind: 'now' | 'listen'; artist: string; title: string; durationMs?: number; listenedAt?: number }): void =>
+    ipcRenderer.send(IPC_CHANNELS.SCROBBLE_SUBMIT, entry),
 
   // Media controls
   mediaPlayPause: (): void => ipcRenderer.send(IPC_CHANNELS.MEDIA_PLAY_PAUSE),

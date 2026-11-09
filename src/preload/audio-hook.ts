@@ -45,7 +45,7 @@ export function installAudioHook(): void {
       const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 512;
-      analyser.smoothingTimeConstant = 0.78;
+      analyser.smoothingTimeConstant = 0.72;
       source.connect(analyser);
       const silent = ctx.createGain();
       silent.gain.value = 0;
@@ -61,7 +61,7 @@ export function installAudioHook(): void {
     try {
       const a = ctx.createAnalyser();
       a.fftSize = 256;
-      a.smoothingTimeConstant = 0.8;
+      a.smoothingTimeConstant = 0.72;
       w.__scAudioAnalyser = a;
     } catch (e) { /* noop */ }
     return w.__scAudioAnalyser;

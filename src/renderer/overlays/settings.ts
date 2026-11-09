@@ -31,7 +31,18 @@ export function getSettingsOverlayHTML(): string {
         </label>
       </div>
 
-      <div class="sc-overlay-group" style="margin-top: 16px;">
+      <div class="sc-overlay-toggle" style="margin-top: 16px;">
+        <div>
+          <span class="sc-overlay-toggle-label">${t('settings.dynamic_accent')}</span>
+          <div style="font-size:11px;opacity:.6;margin-top:2px;">${t('settings.dynamic_accent_desc')}</div>
+        </div>
+        <label class="sc-overlay-switch">
+          <input type="checkbox" id="sc-set-dynaccent">
+          <span class="sc-overlay-switch-slider"></span>
+        </label>
+      </div>
+
+      <div class="sc-overlay-group" id="sc-set-accent-group" style="margin-top: 16px;">
         <span class="sc-overlay-label">${t('settings.accent_color')}</span>
         <div class="sc-color-field">
           <button type="button" class="sc-color-swatch" id="sc-set-accent" aria-label="${t('settings.accent_color')}">
@@ -167,6 +178,8 @@ export function getSettingsOverlayScript(): string {
       const langSelect = panel.querySelector('#sc-set-language');
       const minimized = panel.querySelector('#sc-set-minimized');
       const startup = panel.querySelector('#sc-set-startup');
+      const dynAccent = panel.querySelector('#sc-set-dynaccent');
+      const accentGroup = panel.querySelector('#sc-set-accent-group');
       const accentSwatch = panel.querySelector('#sc-set-accent');
       const accentHex = panel.querySelector('#sc-set-accent-val');
       const accentReset = panel.querySelector('#sc-set-accent-reset');
@@ -273,8 +286,16 @@ export function getSettingsOverlayScript(): string {
         var loaded = _hexToHsv(s.accentColor || '#ff5500');
         if (loaded) _hsv = loaded;
         _renderAccent(true);
-        window.scApplyAccent(_hsvToHex(_hsv.h, _hsv.s, _hsv.v));
+        dynAccent.checked = !!s.dynamicAccent;
+        accentGroup.style.display = dynAccent.checked ? 'none' : '';
+        if (!dynAccent.checked) window.scApplyAccent(_hsvToHex(_hsv.h, _hsv.s, _hsv.v));
         autoUpdate.checked = s.autoUpdate !== false;
+      });
+
+      dynAccent.addEventListener('change', function() {
+        accentGroup.style.display = dynAccent.checked ? 'none' : '';
+        api.storeSet('settings.dynamicAccent', dynAccent.checked);
+        if (window.__scDynAccent) window.__scDynAccent.set(dynAccent.checked);
       });
 
       minimized.addEventListener('change', function() {

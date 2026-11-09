@@ -259,6 +259,8 @@ export function getVisualizerScript(): string {
         }
       }
 
+      window.__scFindArtwork = findArtwork;
+
       function ensureCanvas() {
         if (canvas && canvas.isConnected) return true;
         canvas = document.createElement('canvas');
@@ -290,7 +292,7 @@ export function getVisualizerScript(): string {
             var t = cols > 1 ? j / (cols - 1) : 0;
             var bin = Math.min(bins - 1, Math.floor(Math.pow(t, 1.55) * usable));
             var v = freq[bin] / 255;
-            v = Math.pow(v, 1.3) * 0.96;
+            v = Math.pow(v, 1.2) * 0.96;
             target[j] = clamp(v, 0, 1);
             if (v > peak) peak = v;
           }
@@ -581,7 +583,7 @@ export function getVisualizerScript(): string {
           // Kicks on dense masters keep the low end pinned near the ceiling,
           // so level deviation reads as zero; spectral flux (how much the low
           // band rose since the previous frame) still marks every knock.
-          var lowN = Math.min(16, freq.length);
+          var lowN = Math.min(10, freq.length);
           if (!prevLow || prevLow.length !== lowN) prevLow = new Float32Array(lowN);
           var flux = 0;
           for (var k3 = 0; k3 < lowN; k3++) {
@@ -590,12 +592,12 @@ export function getVisualizerScript(): string {
             prevLow[k3] = freq[k3];
           }
           flux /= lowN * 255;
-          fluxPeak = Math.max(0.02, fluxPeak * 0.995, flux);
-          var kick = clamp(flux / fluxPeak, 0, 1);
+          fluxPeak = Math.max(0.02, fluxPeak * 0.99, flux);
+          var kick = clamp(flux / (fluxPeak * 0.75), 0, 1);
           if (kick > kickLevel) kickLevel += (kick - kickLevel) * 0.8;
-          else kickLevel += (kick - kickLevel) * 0.2;
+          else kickLevel += (kick - kickLevel) * 0.14;
           // Wall-of-bass tracks still get a living base glow.
-          var base = clamp((raw8 - 0.12) * 0.85, 0, 0.6);
+          var base = clamp((raw8 - 0.1) * 0.95, 0, 0.6);
           bass = clamp(base * 0.5 + kickLevel * 0.75, 0, 1);
         }
         glowBass = bass;
@@ -751,6 +753,60 @@ export function getVisualizerScript(): string {
         }
       }
 
+      // SoundCloud modals (add to playlist, share, report...) are rendered in
+      // the page's own stacking order, but the visualizer layers are fixed at a
+      // z-index above everything so they would glow through the dialog. While a
+      // modal is open the layers fade out instead of fighting over z-order.
+      var MODAL_SELECTORS = '.modal.m-visible, .modal__modal, .modalWrapper, .g-modal-wrapper, [role="dialog"], [aria-modal="true"]';
+      var modalHidden = false;
+      var modalCheckAt = 0;
+      var modalCached = false;
+      function modalOpen(now) {
+        if (now - modalCheckAt < 40) return modalCached;
+        modalCheckAt = now;
+        var found = false;
+        var nodes = document.querySelectorAll(MODAL_SELECTORS);
+        for (var i = 0; i < nodes.length; i++) {
+          var n = nodes[i];
+          if (n.id && (n.id.indexOf('sc-') === 0 || n.id.indexOf('onetrust') === 0)) continue;
+          var r = n.getBoundingClientRect();
+          if (r.width < 40 || r.height < 40) continue;
+          var cs = getComputedStyle(n);
+          if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+          found = true;
+          break;
+        }
+        modalCached = found;
+        return found;
+      }
+
+      // Hide instantly (no fade): a fade makes the glow linger over a dialog
+      // that is already on screen. Fading back in on close is fine.
+      function setModalState(open) {
+        if (open === modalHidden) return;
+        modalHidden = open;
+        if (open) {
+          if (canvas) { canvas.style.transition = 'none'; canvas.style.opacity = '0'; }
+          if (glowLayer) { glowLayer.style.transition = 'none'; glowLayer.style.opacity = '0'; }
+          if (glowActive) clearGlow(false);
+        } else {
+          if (canvas) canvas.style.transition = 'opacity .45s ease';
+          if (glowLayer) glowLayer.style.transition = 'opacity .45s ease';
+        }
+      }
+      var modalObsTimer = null;
+      function bindModalObserver() {
+        if (typeof MutationObserver !== 'function' || !document.body) return;
+        new MutationObserver(function() {
+          if (modalObsTimer) return;
+          modalObsTimer = setTimeout(function() {
+            modalObsTimer = null;
+            modalCheckAt = 0;
+            setModalState(modalOpen(performance.now()));
+          }, 30);
+        }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'aria-hidden'] });
+      }
+
       function draw(now) {
         if (document.hidden) { stopLoop(); return; }
         vizFrames++;
@@ -772,6 +828,12 @@ export function getVisualizerScript(): string {
         }
         pauseSince = 0;
         visualsHidden = false;
+
+        setModalState(modalOpen(now));
+        if (modalHidden) {
+          raf = requestAnimationFrame(draw);
+          return;
+        }
 
         if (vizType !== lastType) {
           hideVisuals();
@@ -844,6 +906,7 @@ export function getVisualizerScript(): string {
 
       readSettings();
       bindPlaybackState();
+      bindModalObserver();
       startLoop();
       // Safety net for playback that starts without a click on our play button
       // (autoplay, media keys, auto-advance): one cheap probe per second, and

@@ -1,9 +1,9 @@
-import { app, BrowserWindow, session, globalShortcut, ipcMain, shell, screen } from 'electron';
+import { app, BrowserWindow, session, globalShortcut, ipcMain, shell, screen, dialog, type WebContents } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { spawn, execFile } from 'child_process';
 import { SOUNDCLOUD_URL, WINDOW_CONFIG, IPC_CHANNELS, AD_DOMAINS, AD_CSS_SELECTORS, AD_URL_PATTERNS, CHROME_UA } from '../shared/constants';
-import { applyUserAgentHeaders, UA_SUMMARY } from '../shared/user-agent';
+import { applyUserAgentHeaders, applyFirefoxHeaders, FIREFOX_UA, UA_SUMMARY } from '../shared/user-agent';
 import { setupIPC, getStore, getEncryptionKey } from './ipc';
 import { createTray, destroyTray, setMiniPlayerToggle } from './tray';
 import { checkForUpdates, setupUpdaterIPC } from './updater';
@@ -27,6 +27,10 @@ import { getTitlebarScript } from '../renderer/overlays/titlebar';
 import { getOfflineOverlayHTML, getOfflineOverlayScript } from '../renderer/overlays/offline';
 import { getEqualizerOverlayHTML, getEqualizerOverlayScript } from '../renderer/overlays/equalizer';
 import { getVisualizerScript } from '../renderer/overlays/visualizer';
+import { getPlayerCoreScript } from '../renderer/overlays/player-core';
+import { getDynamicAccentScript } from '../renderer/overlays/dynamic-accent';
+import { getSearchPlusScript } from '../renderer/overlays/search-plus';
+import { getPlayerToolsOverlayHTML, getPlayerToolsOverlayScript } from '../renderer/overlays/player-tools';
 import { isSafeExternalUrl, isTrustedOAuthUrl, isTrustedSoundCloudUrl } from '../shared/security';
 import { matchesCombo, resolveKeybinds, type KeybindAction } from '../shared/keybinds';
 
@@ -55,6 +59,59 @@ app.userAgentFallback = CHROME_UA;
 app.commandLine.appendSwitch('enable-features', 'DnsOverHttps,GlobalShortcutsPortal');
 app.commandLine.appendSwitch('dns-over-https-mode', 'automatic');
 app.commandLine.appendSwitch('dns-over-https-server', 'https://1.1.1.1/dns-query');
+
+const AUTH_PRELOAD = path.join(__dirname, '../preload/auth-preload.js');
+
+// webContents ids of sign-in windows; their requests carry the Firefox identity.
+const authWebContentsIds = new Set<number>();
+
+/**
+ * Sign-in windows (Google & co.) present as Firefox and, if Google still
+ * refuses the browser, point the user at the token login instead of leaving
+ * them on a dead-end error page.
+ */
+function trackAuthWindow(wc: WebContents, authWin: BrowserWindow | null, main: BrowserWindow): void {
+  authWebContentsIds.add(wc.id);
+  const id = wc.id;
+  wc.setUserAgent(FIREFOX_UA);
+  wc.once('destroyed', () => authWebContentsIds.delete(id));
+
+  let warned = false;
+  const check = (_event: unknown, url: string) => {
+    if (warned) return;
+    try {
+      const u = new URL(url);
+      if (u.hostname !== 'accounts.google.com' || !/rejected/i.test(u.pathname)) return;
+    } catch { return; }
+    warned = true;
+    logWarn('[Auth] Google rejected the sign-in browser; offering token login');
+    showAuthRejectedHint(main, authWin);
+  };
+  wc.on('did-navigate', check);
+  wc.on('did-navigate-in-page', check);
+  wc.on('did-redirect-navigation', (details: any) => check(null, details?.url ?? ''));
+}
+
+function showAuthRejectedHint(main: BrowserWindow, authWin: BrowserWindow | null): void {
+  if (main.isDestroyed()) return;
+  const openTokenPanel = () => main.webContents.executeJavaScript(
+    `(function(){var i=document.querySelector('[data-target="auth-token"]'); if(i) i.click(); else if(window.__scOpenOverlay) window.__scOpenOverlay();})();`
+  ).catch(() => {});
+  dialog.showMessageBox(main, {
+    type: 'warning',
+    title: 'SixteenCloud',
+    message: t('auth.google_blocked_title'),
+    detail: t('auth.google_blocked_detail'),
+    buttons: [t('auth.google_blocked_token'), t('auth.google_blocked_close')],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  }).then(async ({ response }) => {
+    if (authWin && !authWin.isDestroyed()) authWin.close();
+    if (main.isDestroyed()) return;
+    if (response === 0) openTokenPanel();
+  }).catch(() => {});
+}
 
 function createWindow(): BrowserWindow {
   const iconFile = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
@@ -184,7 +241,20 @@ function createWindow(): BrowserWindow {
   win.webContents.setWindowOpenHandler(({ url }) => {
     // about:blank popups are intermediate OAuth steps — allow them as a new window
     if (url === 'about:blank') {
-      return { action: 'allow' };
+      // Popup that SoundCloud later navigates to the provider. Do not let it
+      // inherit the main window's privileged preload.
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          autoHideMenuBar: true,
+          webPreferences: {
+            preload: AUTH_PRELOAD,
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: true,
+          },
+        },
+      };
     }
 
     try {
@@ -201,12 +271,15 @@ function createWindow(): BrowserWindow {
           height: 700,
           parent: win,
           modal: false,
+          autoHideMenuBar: true,
           webPreferences: {
+            preload: AUTH_PRELOAD,
             nodeIntegration: false,
             contextIsolation: true,
             sandbox: true,
           },
         });
+        trackAuthWindow(authWin.webContents, authWin, win);
         authWin.loadURL(url);
 
         // When OAuth redirects back to SoundCloud, load it in main window and close popup
@@ -249,6 +322,7 @@ function createWindow(): BrowserWindow {
 
   // Also handle about:blank popups that get navigated to OAuth URLs after creation
   win.webContents.on('did-create-window', (childWindow) => {
+    trackAuthWindow(childWindow.webContents, childWindow, win);
     childWindow.webContents.on('will-navigate', (_event, navUrl) => {
       try {
         if (isTrustedOAuthUrl(navUrl)) {
@@ -563,6 +637,7 @@ function getOverlayInitScript(): string {
     { id: 'history', icon: icon('M4 5.5A2.5 2.5 0 0 1 6.5 3H19v17H6.5A2.5 2.5 0 0 1 4 17.5v-12ZM4 17.5A2.5 2.5 0 0 1 6.5 15H19M8 7h7M8 10h7'), label: t('nav.history') },
     { id: 'offline-cache', icon: icon('<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"><path d="M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9.5a3.5 3.5 0 0 1 .5 6.96"/><path d="M12 12v6m0 0-2.5-2.5M12 18l2.5-2.5"/></g>'), label: t('nav.offline') },
     { id: 'lyrics', icon: icon('M9 18V6l10-2v12M9 18a3 3 0 1 1-3-3 3 3 0 0 1 3 3Zm10-2a3 3 0 1 1-3-3 3 3 0 0 1 3 3Z'), label: t('nav.lyrics') },
+    { id: 'player', icon: icon('<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2.5h6"/></g>'), label: t('nav.player') },
     { id: 'equalizer', icon: icon('<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>'), label: t('nav.equalizer') },
     { id: 'themes', icon: icon('M12 3a9 9 0 1 0 0 18h1.2a1.8 1.8 0 0 0 1.3-3.1 1.8 1.8 0 0 1 1.3-3.1H18a3 3 0 0 0 3-3A8.9 8.9 0 0 0 12 3ZM7 11h.01M8.5 7.5h.01M13 6h.01M17 9h.01'), label: t('nav.themes') },
     { id: 'custom-css', icon: icon('M8 8 4 12l4 4M16 8l4 4-4 4M14 5l-4 14'), label: t('nav.custom_css') },
@@ -1140,6 +1215,7 @@ function injectOverlayPanels(win: BrowserWindow): void {
     'history': { html: getHistoryOverlayHTML(), script: getHistoryOverlayScript() },
     'lyrics': { html: getLyricsOverlayHTML(), script: getLyricsOverlayScript() },
     'equalizer': { html: getEqualizerOverlayHTML(), script: getEqualizerOverlayScript() },
+    'player': { html: getPlayerToolsOverlayHTML(), script: getPlayerToolsOverlayScript() },
     'themes': { html: getThemesOverlayHTML(), script: getThemesOverlayScript() },
     'custom-css': { html: getCustomCssOverlayHTML(), script: getCustomCssOverlayScript() },
     'offline-cache': { html: getOfflineOverlayHTML(), script: getOfflineOverlayScript() },
@@ -1187,6 +1263,16 @@ function injectOverlayPanels(win: BrowserWindow): void {
 
   win.webContents.executeJavaScript(getVisualizerScript())
     .catch((e: any) => logWarn('visualizer inject error:', e?.message));
+
+  // Player features that depend on the visualizer's artwork finder.
+  for (const [name, script] of [
+    ['player core', getPlayerCoreScript()],
+    ['dynamic accent', getDynamicAccentScript()],
+    ['search plus', getSearchPlusScript()],
+  ] as const) {
+    win.webContents.executeJavaScript(script)
+      .catch((e: any) => logWarn(`${name} inject error:`, e?.message));
+  }
 }
 
 // --- Geo-Bypass ---
@@ -1238,7 +1324,18 @@ async function setupGeoBypass(): Promise<void> {
     // Chromium client hints even when the UA is replaced, and a UA that claims
     // a different OS than the hints is an automation tell. Rewrite the whole
     // identity block from one platform profile (see shared/user-agent.ts).
-    if (isTrustedSoundCloudUrl(details.url) || /(^|\.)sndcdn\.com$/i.test(safeHostname(details.url))) {
+    // Sign-in providers get the same identity: Google compares Sec-CH-UA
+    // against the UA and rejects a Chromium-only brand list as "not secure".
+    if (authWebContentsIds.has(details.webContentsId ?? -1) && !isTrustedSoundCloudUrl(details.url)) {
+      applyFirefoxHeaders(details.requestHeaders);
+      callback({ requestHeaders: details.requestHeaders });
+      return;
+    }
+    if (
+      isTrustedSoundCloudUrl(details.url) ||
+      isTrustedOAuthUrl(details.url) ||
+      /(^|\.)(sndcdn\.com|gstatic\.com|googleusercontent\.com)$/i.test(safeHostname(details.url))
+    ) {
       if (applyUserAgentHeaders(details.requestHeaders)) {
         callback({ requestHeaders: details.requestHeaders });
         return;
@@ -2276,8 +2373,8 @@ app.whenReady().then(() => {
   if (mainWindow) {
     createTray(mainWindow);
   }
-  setupUpdaterIPC();
-  if (getStore()?.get('settings.autoUpdate') !== false) checkForUpdates();
+  setupUpdaterIPC(mainWindow!);
+  if (getStore()?.get('settings.autoUpdate') !== false) checkForUpdates(mainWindow!);
 
   // Handle deep link on first launch (Windows: URL is in process.argv)
   const deepLinkUrl = process.argv.find(arg => arg.startsWith('sixteencloud://'));

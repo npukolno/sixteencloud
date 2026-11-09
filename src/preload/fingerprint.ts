@@ -22,6 +22,26 @@ export function installFingerprintAlignment(): void {
   'use strict';
   const w = window as unknown as Record<string, any>;
   const n = w.navigator;
+
+  // Real Chrome always defines `window.chrome`; Electron pages get none, and
+  // sign-in risk checks (Google) treat its absence as an embedded browser.
+  try {
+    if (!w.chrome) {
+      const noop = function () { /* stub */ };
+      Object.defineProperty(w, 'chrome', {
+        configurable: true,
+        writable: true,
+        enumerable: true,
+        value: {
+          app: { isInstalled: false, InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' }, RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' } },
+          runtime: {},
+          loadTimes: noop,
+          csi: noop,
+        },
+      });
+    }
+  } catch (e) { /* best-effort */ }
+
   if (!n || !n.userAgentData || w.__scUachAligned) return;
 
   try {

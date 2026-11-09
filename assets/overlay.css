@@ -126,6 +126,19 @@ body {
   height: 20px;
   cursor: pointer;
 }
+/* The UA draws a faint rectangle around a focused range input; the thumb
+   gets its own focus ring instead, so no slider shows a box. */
+#sc-overlay-container input[type="range"],
+#sc-overlay-container input[type="range"]:focus,
+#sc-overlay-container input[type="range"]:focus-visible,
+#sc-overlay-container input[type="range"]:active {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+#sc-overlay-container input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(var(--sc-accent-rgb, 255, 85, 0), 0.32), 0 1px 4px rgba(0, 0, 0, 0.45);
+}
 #sc-overlay-container input[type="range"]::-webkit-slider-runnable-track {
   height: 4px;
   border: none;

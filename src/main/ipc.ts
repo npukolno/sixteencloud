@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, dialog, session, app, net } from 'electron';
+import { ipcMain, BrowserWindow, dialog, session, app, net, Notification, nativeImage } from 'electron';
 import Store from 'electron-store';
 import path from 'path';
 import fs from 'fs';
@@ -11,6 +11,7 @@ import { StoreSchema, DownloadRequest } from '../shared/types';
 import { isAllowedMediaUrl, isTrustedSoundCloudUrl } from '../shared/security';
 import { KEYBIND_ACTIONS, parseCombo } from '../shared/keybinds';
 import { getCoverPalette } from './cover-palette';
+import { foldFancy, cleanLyricsTitle, cleanLyricsArtist, parseSoundCloudTrack, matchScore, type LyricsQuery } from '../shared/lyrics-match';
 
 // Converting needs a real ffmpeg. The bundled ffmpeg-static binary can be
 // missing or built for another platform, so fall back to a system ffmpeg
@@ -50,6 +51,7 @@ const STORE_KEYS = new Set([
   'adblocker', 'adblocker.enabled', 'adblocker.blockedCount', 'adblocker.customRules', 'adblocker.whitelist',
   'adblocker.remoteDomains', 'adblocker.lastUpdated', 'downloader', 'downloader.outputDir', 'downloader.quality',
   'downloader.history', 'settings', 'settings.startMinimized', 'settings.launchOnStartup', 'settings.accentColor',
+  'settings.dynamicAccent', 'player', 'player.skipPromoted', 'player.skipPreviews', 'player.notifications', 'player.scrobble', 'player.speed', 'searchHistory', 'wave',
   'settings.autoUpdate', 'settings.keybinds', 'history', 'history.enabled', 'history.maxTracks', 'history.tracks', 'history.stats', 'lyrics',
   'lyrics.fontSize', 'themes', 'themes.active', 'themes.custom', 'customCss', 'customCss.code', 'equalizer', 'visualizer',
   'sidebar',
@@ -77,6 +79,19 @@ function validateStoreValue(key: string, value: unknown): void {
   }
   if (key === 'settings.accentColor' && (typeof value !== 'string' || !/^#[0-9a-f]{3,8}$/i.test(value))) {
     throw new Error('Invalid accent color');
+  }
+  if ((key === 'settings.dynamicAccent' || key === 'player.skipPromoted' || key === 'player.skipPreviews' ||
+       key === 'player.notifications' || key === 'player.scrobble') && typeof value !== 'boolean') {
+    throw new Error('Invalid flag');
+  }
+  if (key === 'player.speed' && (typeof value !== 'number' || !Number.isFinite(value) || value < 0.25 || value > 3)) {
+    throw new Error('Invalid speed');
+  }
+  if (key === 'wave') {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || JSON.stringify(value).length > 250000) throw new Error('Invalid wave data');
+  }
+  if (key === 'searchHistory' && (!Array.isArray(value) || value.length > 30 || value.some((v) => typeof v !== 'string' || v.length > 200))) {
+    throw new Error('Invalid search history');
   }
   if (key === 'lyrics.fontSize' && (typeof value !== 'number' || !Number.isFinite(value) || value < 8 || value > 72)) {
     throw new Error('Invalid font size');
@@ -194,6 +209,13 @@ function eFetch(url: string, opts: RequestInit = {}): Promise<Response> {
   return net.fetch(url, { ...opts, headers });
 }
 
+function fetchWithTimeoutShared(url: string, timeoutMs: number): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), timeoutMs);
+    eFetch(url).then((r) => { clearTimeout(timer); resolve(r); }).catch((e) => { clearTimeout(timer); reject(e); });
+  });
+}
+
 let store: Store<StoreSchema>;
 let cachedClientId: string | null = null;
 
@@ -290,6 +312,51 @@ export async function resolveTrackStream(trackUrl: string): Promise<ResolvedTrac
 
 function safeSend(win: BrowserWindow, channel: string, ...args: unknown[]): void {
   if (!win.isDestroyed()) win.webContents.send(channel, ...args);
+}
+
+type AuthResult = { success: boolean; error?: string; user?: { isLoggedIn: boolean; username: string; avatarUrl: string; userId: string } };
+
+/** Validate an OAuth token against the API and install it as the SoundCloud session. */
+async function applyAuthToken(mainWindow: BrowserWindow, token: string): Promise<AuthResult> {
+  if (typeof token !== 'string' || token.length < 8 || token.length > 4096 || !/^[A-Za-z0-9._~-]+$/.test(token)) {
+    return { success: false, error: 'Invalid token format' };
+  }
+  try {
+    const response = await eFetch(`${SOUNDCLOUD_API_V2}/me`, {
+      headers: { 'Authorization': `OAuth ${token}` },
+    });
+    if (!response.ok) {
+      return { success: false, error: `API returned ${response.status}` };
+    }
+    const user = await response.json() as { username?: string; avatar_url?: string; id?: number };
+    store.set('authToken.token', token);
+
+    // Inject token into SoundCloud cookies
+    const cookie = {
+      url: 'https://soundcloud.com',
+      name: 'oauth_token',
+      value: token,
+    };
+    await session.defaultSession.cookies.set(cookie);
+
+    // Also inject into page localStorage
+    !mainWindow.isDestroyed() && mainWindow.webContents.executeJavaScript(
+      `localStorage.setItem('oauth_token', ${JSON.stringify(token)});`
+    ).catch(() => {});
+
+    const authState = {
+      isLoggedIn: true,
+      username: user.username || '',
+      avatarUrl: user.avatar_url || '',
+      userId: String(user.id || ''),
+    };
+    safeSend(mainWindow,IPC_CHANNELS.AUTH_STATE, authState);
+    // The page only reads the cookie at boot; reload so SoundCloud picks it up.
+    if (!mainWindow.isDestroyed()) setTimeout(() => { if (!mainWindow.isDestroyed()) mainWindow.webContents.reload(); }, 300);
+    return { success: true, user: authState };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  }
 }
 
 export function setupIPC(mainWindow: BrowserWindow): void {
@@ -431,43 +498,7 @@ export function setupIPC(mainWindow: BrowserWindow): void {
   // Auth - set token and validate
   ipcMain.handle(IPC_CHANNELS.AUTH_SET_TOKEN, async (event, token: string) => {
     assertMainRenderer(event, mainWindow);
-    if (typeof token !== 'string' || token.length < 8 || token.length > 512 || !/^[A-Za-z0-9._~-]+$/.test(token)) {
-      return { success: false, error: 'Invalid token format' };
-    }
-    try {
-      const response = await eFetch(`${SOUNDCLOUD_API_V2}/me`, {
-        headers: { 'Authorization': `OAuth ${token}` },
-      });
-      if (!response.ok) {
-        return { success: false, error: `API returned ${response.status}` };
-      }
-      const user = await response.json() as { username?: string; avatar_url?: string; id?: number };
-      store.set('authToken.token', token);
-
-      // Inject token into SoundCloud cookies
-      const cookie = {
-        url: 'https://soundcloud.com',
-        name: 'oauth_token',
-        value: token,
-      };
-      await session.defaultSession.cookies.set(cookie);
-
-      // Also inject into page localStorage
-      !mainWindow.isDestroyed() && mainWindow.webContents.executeJavaScript(
-        `localStorage.setItem('oauth_token', ${JSON.stringify(token)});`
-      ).catch(() => {});
-
-      const authState = {
-        isLoggedIn: true,
-        username: user.username || '',
-        avatarUrl: user.avatar_url || '',
-        userId: String(user.id || ''),
-      };
-      safeSend(mainWindow,IPC_CHANNELS.AUTH_STATE, authState);
-      return { success: true, user: authState };
-    } catch (err) {
-      return { success: false, error: String(err) };
-    }
+    return applyAuthToken(mainWindow, token);
   });
 
   ipcMain.handle(IPC_CHANNELS.AUTH_VALIDATE, async (event) => {
@@ -502,6 +533,91 @@ export function setupIPC(mainWindow: BrowserWindow): void {
       localStorage.removeItem('oauth_token');
     `).catch(() => {});
     safeSend(mainWindow,IPC_CHANNELS.AUTH_STATE, { isLoggedIn: false });
+  });
+
+  // --- Track notifications -------------------------------------------------
+  let lastNotifyAt = 0;
+  ipcMain.on(IPC_CHANNELS.NOTIFY_TRACK, async (event, info: { title?: unknown; artist?: unknown; artwork?: unknown }) => {
+    try {
+      assertMainRenderer(event, mainWindow);
+      if (process.platform === 'linux') return; // linux-integration shows the branded one
+      if (!(store as any).get('player.notifications')) return;
+      if (!Notification.isSupported() || mainWindow.isFocused()) return;
+      const now = Date.now();
+      if (now - lastNotifyAt < 1500) return;
+      lastNotifyAt = now;
+      const title = typeof info?.title === 'string' ? info.title.slice(0, 200) : '';
+      const artist = typeof info?.artist === 'string' ? info.artist.slice(0, 200) : '';
+      if (!title) return;
+      let icon: Electron.NativeImage | undefined;
+      if (typeof info.artwork === 'string' && isAllowedMediaUrl(info.artwork)) {
+        try {
+          const resp = await fetchWithTimeoutShared(info.artwork.replace(/-(?:t\d+x\d+|small|badge|crop|large|original)\./, '-t200x200.'), 4000);
+          if (resp.ok) {
+            const img = nativeImage.createFromBuffer(Buffer.from(await resp.arrayBuffer()));
+            if (!img.isEmpty()) icon = img;
+          }
+        } catch { /* a notification without a cover is fine */ }
+      }
+      new Notification({ title, body: artist, silent: true, icon }).show();
+    } catch (e: any) {
+      logWarn('[Notify] failed:', e?.message);
+    }
+  });
+
+  // --- ListenBrainz scrobbling ---------------------------------------------
+  // The token never leaves the main process: the renderer can set it and ask
+  // whether one exists, but cannot read it back.
+  const LB_API = 'https://api.listenbrainz.org/1';
+  ipcMain.handle(IPC_CHANNELS.SCROBBLE_TOKEN, async (event, token: unknown) => {
+    assertMainRenderer(event, mainWindow);
+    if (typeof token !== 'string') return { success: false, error: 'Invalid token' };
+    const value = token.trim();
+    if (!value) { (store as any).delete('scrobble'); return { success: true }; }
+    if (!/^[A-Za-z0-9-]{20,64}$/.test(value)) return { success: false, error: 'Invalid token' };
+    try {
+      const resp = await eFetch(`${LB_API}/validate-token`, { headers: { Authorization: `Token ${value}` } });
+      const data = await resp.json() as { valid?: boolean; user_name?: string };
+      if (!resp.ok || !data.valid) return { success: false, error: 'Invalid token' };
+      (store as any).set('scrobble', { token: value, user: data.user_name || '' });
+      return { success: true, user: data.user_name || '' };
+    } catch (e: any) {
+      return { success: false, error: String(e?.message || e) };
+    }
+  });
+  ipcMain.handle(IPC_CHANNELS.SCROBBLE_STATUS, async (event) => {
+    assertMainRenderer(event, mainWindow);
+    const sc = (store as any).get('scrobble') as { token?: string; user?: string } | undefined;
+    return { hasToken: !!sc?.token, user: sc?.user || '' };
+  });
+  ipcMain.on(IPC_CHANNELS.SCROBBLE_SUBMIT, async (event, entry: { kind?: string; artist?: unknown; title?: unknown; durationMs?: unknown; listenedAt?: unknown }) => {
+    try {
+      assertMainRenderer(event, mainWindow);
+      if (!(store as any).get('player.scrobble')) return;
+      const sc = (store as any).get('scrobble') as { token?: string } | undefined;
+      if (!sc?.token) return;
+      const artist = typeof entry?.artist === 'string' ? entry.artist.trim().slice(0, 300) : '';
+      const title = typeof entry?.title === 'string' ? entry.title.trim().slice(0, 300) : '';
+      if (!artist || !title) return;
+      const meta: Record<string, unknown> = {
+        artist_name: artist, track_name: title,
+        additional_info: {
+          media_player: 'SixteenCloud', submission_client: 'SixteenCloud', music_service: 'soundcloud.com',
+          ...(typeof entry.durationMs === 'number' && entry.durationMs > 0 ? { duration_ms: Math.round(entry.durationMs) } : {}),
+        },
+      };
+      const body = entry.kind === 'now'
+        ? { listen_type: 'playing_now', payload: [{ track_metadata: meta }] }
+        : { listen_type: 'single', payload: [{ listened_at: typeof entry.listenedAt === 'number' ? Math.floor(entry.listenedAt) : Math.floor(Date.now() / 1000), track_metadata: meta }] };
+      const resp = await eFetch(`${LB_API}/submit-listens`, {
+        method: 'POST',
+        headers: { Authorization: `Token ${sc.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) logWarn(`[Scrobble] ListenBrainz answered ${resp.status}`);
+    } catch (e: any) {
+      logWarn('[Scrobble] failed:', e?.message);
+    }
   });
 
   // Escape special characters for FFmpeg metadata values
@@ -880,22 +996,25 @@ export function setupIPC(mainWindow: BrowserWindow): void {
     return null;
   }
 
-  interface LrclibEntry { plainLyrics?: string; syncedLyrics?: string; duration?: number }
+  interface LrclibEntry { plainLyrics?: string; syncedLyrics?: string; duration?: number; trackName?: string; artistName?: string }
 
   /** Pick the best lrclib entry: synced beats plain, closest duration breaks ties. */
-  function pickLrclib(entries: Array<LrclibEntry | null>, duration?: number): { lyrics: string; syncedLyrics?: string; source: string } | null {
-    const list = entries.filter((e): e is LrclibEntry => !!e && !!(e.syncedLyrics || e.plainLyrics));
-    if (!list.length) return null;
+  function pickLrclib(entries: Array<LrclibEntry | null>, duration: number | undefined, wanted: LyricsQuery[]): { lyrics: string; syncedLyrics?: string; source: string } | null {
+    // Only entries whose name matches the track count; "closest duration" alone
+    // happily returned an unrelated song of the same length.
+    const scored = entries
+      .filter((e): e is LrclibEntry => !!e && !!(e.syncedLyrics || e.plainLyrics))
+      .map((e) => ({ e, m: matchScore(e.trackName, e.artistName, wanted, (typeof duration === 'number' && duration > 0 && typeof e.duration === 'number') ? Math.abs(e.duration - duration) : undefined) }))
+      .filter((x) => x.m > 0);
+    if (!scored.length) return null;
     const dist = (e: LrclibEntry): number =>
       (typeof duration === 'number' && duration > 0 && typeof e.duration === 'number') ? Math.abs(e.duration - duration) : 0;
-    const withSynced = list.filter(e => e.syncedLyrics).sort((a, b) => dist(a) - dist(b));
-    if (withSynced.length) return parseLrclibResult(withSynced[0]);
-    const plain = list.slice().sort((a, b) => dist(a) - dist(b));
-    return parseLrclibResult(plain[0]);
+    scored.sort((a, b) => (Number(!!b.e.syncedLyrics) - Number(!!a.e.syncedLyrics)) || ((b.m - dist(b.e) * 0.02) - (a.m - dist(a.e) * 0.02)));
+    return parseLrclibResult(scored[0].e);
   }
 
   /** NetEase Cloud Music — deep RU/JA/KR catalogue with time-synced LRC. */
-  async function fetchNetease(query: string, duration?: number): Promise<{ lyrics: string; syncedLyrics?: string; source: string } | null> {
+  async function fetchNetease(query: string, duration: number | undefined, wanted: LyricsQuery[]): Promise<{ lyrics: string; syncedLyrics?: string; source: string } | null> {
     try {
       const headers = { 'User-Agent': CHROME_UA, 'Referer': 'https://music.163.com/' };
       const searchResp = await fetchWithTimeout(
@@ -903,16 +1022,16 @@ export function setupIPC(mainWindow: BrowserWindow): void {
         LYRICS_TIMEOUT, { headers }
       );
       if (!searchResp.ok) return null;
-      const searchData = await searchResp.json() as { result?: { songs?: Array<{ id?: number; duration?: number }> } };
+      const searchData = await searchResp.json() as { result?: { songs?: Array<{ id?: number; name?: string; duration?: number; artists?: Array<{ name?: string }> }> } };
       const songs = searchData.result?.songs || [];
       if (!songs.length) return null;
-      let song = songs[0];
-      if (typeof duration === 'number' && duration > 0) {
-        // NetEase reports durations in milliseconds.
-        song = songs.slice().sort((a, b) =>
-          Math.abs((a.duration || 1e9) / 1000 - duration) - Math.abs((b.duration || 1e9) / 1000 - duration)
-        )[0] || song;
-      }
+      // NetEase reports durations in milliseconds.
+      const ranked = songs
+        .map((x) => ({ x, m: matchScore(x.name, (x.artists || []).map(a => a.name).join(' '), wanted, (typeof duration === 'number' && duration > 0 && x.duration) ? Math.abs(x.duration / 1000 - duration) : undefined) }))
+        .filter((r) => r.m > 0)
+        .sort((a, b) => (b.m - (typeof duration === 'number' && duration > 0 ? Math.abs((b.x.duration || 1e9) / 1000 - duration) * 0.02 : 0)) - (a.m - (typeof duration === 'number' && duration > 0 ? Math.abs((a.x.duration || 1e9) / 1000 - duration) * 0.02 : 0)));
+      if (!ranked.length) return null;
+      const song = ranked[0].x;
       if (!song?.id) return null;
       const lyricResp = await fetchWithTimeout(
         `https://music.163.com/api/song/lyric?id=${song.id}&lv=-1&kv=-1&tv=-1`,
@@ -928,7 +1047,7 @@ export function setupIPC(mainWindow: BrowserWindow): void {
   }
 
   /** QQ Music — time-synced LRC; search rows carry durations in seconds. */
-  async function fetchQQMusic(query: string, duration?: number): Promise<{ lyrics: string; syncedLyrics?: string; source: string } | null> {
+  async function fetchQQMusic(query: string, duration: number | undefined, wanted: LyricsQuery[]): Promise<{ lyrics: string; syncedLyrics?: string; source: string } | null> {
     try {
       const headers = { 'User-Agent': CHROME_UA, 'Referer': 'https://y.qq.com/' };
       const searchResp = await fetchWithTimeout(
@@ -936,15 +1055,15 @@ export function setupIPC(mainWindow: BrowserWindow): void {
         LYRICS_TIMEOUT, { headers }
       );
       if (!searchResp.ok) return null;
-      const searchData = await searchResp.json() as { data?: { song?: { list?: Array<{ mid?: string; interval?: number }> } } };
+      const searchData = await searchResp.json() as { data?: { song?: { list?: Array<{ mid?: string; name?: string; interval?: number; singer?: Array<{ name?: string }> }> } } };
       const songs = searchData.data?.song?.list || [];
       if (!songs.length) return null;
-      let song = songs[0];
-      if (typeof duration === 'number' && duration > 0) {
-        song = songs.slice().sort((a, b) =>
-          Math.abs((a.interval || 1e9) - duration) - Math.abs((b.interval || 1e9) - duration)
-        )[0] || song;
-      }
+      const ranked = songs
+        .map((x) => ({ x, m: matchScore(x.name, (x.singer || []).map(a => a.name).join(' '), wanted, (typeof duration === 'number' && duration > 0 && x.interval) ? Math.abs(x.interval - duration) : undefined) }))
+        .filter((r) => r.m > 0)
+        .sort((a, b) => (b.m - (typeof duration === 'number' && duration > 0 ? Math.abs((b.x.interval || 1e9) - duration) * 0.02 : 0)) - (a.m - (typeof duration === 'number' && duration > 0 ? Math.abs((a.x.interval || 1e9) - duration) * 0.02 : 0)));
+      if (!ranked.length) return null;
+      const song = ranked[0].x;
       if (!song?.mid) return null;
       const lyricResp = await fetchWithTimeout(
         `https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid=${encodeURIComponent(song.mid)}&format=json&nobase64=1&g_tk=5381`,
@@ -1117,6 +1236,177 @@ export function setupIPC(mainWindow: BrowserWindow): void {
     return lyrics.length > 20 ? lyrics : null;
   }
 
+  // --- Manual lyric choice ----------------------------------------------------
+  interface LyricsCandidate { id: string; source: string; label: string; synced: boolean; lyrics: string; syncedLyrics?: string; durationDiff?: number }
+
+  async function collectLyricsCandidates(query: string, dur: number | undefined, altQuery: string | undefined, wanted: LyricsQuery[]): Promise<LyricsCandidate[]> {
+    const out: LyricsCandidate[] = [];
+    const add = (c: LyricsCandidate | null) => { if (c && c.lyrics) out.push(c); };
+
+    const lrclib = (async () => {
+      try {
+        const qs = Array.from(new Set([query, altQuery || ''].filter(Boolean)));
+        const lists = await Promise.all(qs.map(async (q) => {
+          try {
+            const resp = await fetchWithTimeout(`https://lrclib.net/api/search?q=${encodeURIComponent(q)}`, LYRICS_TIMEOUT + 1500);
+            return resp.ok ? await resp.json() as Array<{ id?: number; trackName?: string; artistName?: string; duration?: number; plainLyrics?: string; syncedLyrics?: string }> : [];
+          } catch { return []; }
+        }));
+        const seenIds = new Set<number | undefined>();
+        const list = ([] as typeof lists[0]).concat(...lists).filter((e) => !seenIds.has(e.id) && !!seenIds.add(e.id));
+        for (const e of list.slice(0, 12)) {
+          const lyrics = e.syncedLyrics ? (lrcToPlain(e.syncedLyrics) || e.syncedLyrics) : (e.plainLyrics || '');
+          add({
+            id: `lrclib:${e.id}`, source: 'lrclib', label: `${e.artistName || '?'} — ${e.trackName || '?'}`,
+            synced: !!e.syncedLyrics, lyrics, syncedLyrics: e.syncedLyrics || undefined,
+            durationDiff: dur && e.duration ? Math.abs(e.duration - dur) : undefined,
+          });
+        }
+      } catch { /* source unavailable */ }
+    })();
+
+    const netease = (async () => {
+      try {
+        const headers = { 'User-Agent': CHROME_UA, 'Referer': 'https://music.163.com/' };
+        const resp = await fetchWithTimeout(`https://music.163.com/api/search/get/web?s=${encodeURIComponent(query)}&type=1&offset=0&limit=6`, LYRICS_TIMEOUT, { headers });
+        if (!resp.ok) return;
+        const data = await resp.json() as { result?: { songs?: Array<{ id?: number; name?: string; duration?: number; artists?: Array<{ name?: string }> }> } };
+        const songs = (data.result?.songs || []).slice(0, 5);
+        await Promise.all(songs.map(async (song) => {
+          try {
+            const lr = await fetchWithTimeout(`https://music.163.com/api/song/lyric?id=${song.id}&lv=-1&kv=-1&tv=-1`, LYRICS_TIMEOUT, { headers });
+            if (!lr.ok) return;
+            const lrc = (((await lr.json()) as { lrc?: { lyric?: string } }).lrc?.lyric || '').trim();
+            if (lrc.length < 20) return;
+            const synced = /\[\d{1,3}:\d{1,2}/.test(lrc);
+            add({
+              id: `netease:${song.id}`, source: 'netease',
+              label: `${(song.artists || []).map(a => a.name).filter(Boolean).join(', ') || '?'} — ${song.name || '?'}`,
+              synced, lyrics: synced ? (lrcToPlain(lrc) || lrc) : lrc, syncedLyrics: synced ? lrc : undefined,
+              durationDiff: dur && song.duration ? Math.abs(song.duration / 1000 - dur) : undefined,
+            });
+          } catch { /* skip this song */ }
+        }));
+      } catch { /* source unavailable */ }
+    })();
+
+    const qq = (async () => {
+      try {
+        const headers = { 'User-Agent': CHROME_UA, 'Referer': 'https://y.qq.com/' };
+        const resp = await fetchWithTimeout(`https://c.y.qq.com/soso/fcgi-bin/client_search_cp?p=1&n=5&w=${encodeURIComponent(query)}&format=json&new_json=1`, LYRICS_TIMEOUT, { headers });
+        if (!resp.ok) return;
+        const data = await resp.json() as { data?: { song?: { list?: Array<{ mid?: string; name?: string; interval?: number; singer?: Array<{ name?: string }> }> } } };
+        const songs = (data.data?.song?.list || []).slice(0, 4);
+        await Promise.all(songs.map(async (song) => {
+          try {
+            const lr = await fetchWithTimeout(
+              `https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid=${encodeURIComponent(song.mid || '')}&format=json&nobase64=1&g_tk=5381`,
+              LYRICS_TIMEOUT, { headers: { ...headers, 'Referer': 'https://y.qq.com/portal/player.html' } });
+            if (!lr.ok) return;
+            const lrc = (((await lr.json()) as { lyric?: string }).lyric || '').trim()
+              .replace(/&#(\d+);/g, (_m, d: string) => String.fromCharCode(Number(d)))
+              .replace(/&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+            if (lrc.length < 20 || !/\[\d{1,3}:\d{1,2}/.test(lrc)) return;
+            add({
+              id: `qq:${song.mid}`, source: 'qqmusic',
+              label: `${(song.singer || []).map(a => a.name).filter(Boolean).join(', ') || '?'} — ${song.name || '?'}`,
+              synced: true, lyrics: lrcToPlain(lrc) || lrc, syncedLyrics: lrc,
+              durationDiff: dur && song.interval ? Math.abs(song.interval - dur) : undefined,
+            });
+          } catch { /* skip this song */ }
+        }));
+      } catch { /* source unavailable */ }
+    })();
+
+    // Genius has plain text for many tracks the synced catalogues lack.
+    const genius = (async () => {
+      try {
+        const resp = await fetchWithTimeout(`https://genius.com/api/search/song?q=${encodeURIComponent(query)}`, LYRICS_TIMEOUT + 2000, { headers: { 'User-Agent': CHROME_UA } });
+        if (!resp.ok) return;
+        const data = await resp.json() as { response?: { sections?: Array<{ hits?: Array<{ result?: { url?: string; title?: string; primary_artist?: { name?: string } } }> }> } };
+        const hits = (data.response?.sections?.[0]?.hits || []).slice(0, 3);
+        await Promise.all(hits.map(async (h) => {
+          try {
+            if (!h.result?.url) return;
+            const page = await fetchWithTimeout(h.result.url, LYRICS_TIMEOUT + 2000, { headers: { 'User-Agent': CHROME_UA } });
+            if (!page.ok) return;
+            const lyrics = extractGeniusLyrics(await page.text());
+            if (!lyrics) return;
+            add({ id: `genius:${h.result.url}`, source: 'genius', label: `${h.result.primary_artist?.name || '?'} — ${h.result.title || '?'}`, synced: false, lyrics });
+          } catch { /* skip this hit */ }
+        }));
+      } catch { /* source unavailable */ }
+    })();
+
+    await Promise.all([lrclib, netease, qq, genius]);
+    // Relevance first: a synced lyric of the wrong song is worse than a plain one
+    // of the right song. Labels are "artist — title"; unrelated hits are dropped
+    // (unless nothing matches at all, so the list is never empty by our own doing).
+    const seenText = new Set<string>();
+    const ranked = out
+      .filter((c) => { const k = c.lyrics.slice(0, 120); if (seenText.has(k)) return false; seenText.add(k); return true; })
+      .map((c) => {
+        const parts = c.label.split(' \u2014 ');
+        const artistName = parts.length > 1 ? parts[0] : '';
+        const name = parts.length > 1 ? parts.slice(1).join(' \u2014 ') : c.label;
+        return { c, rel: matchScore(name, artistName, wanted, c.durationDiff) };
+      });
+    const relevant = ranked.filter((x) => x.rel > 0);
+    return (relevant.length ? relevant : ranked)
+      .sort((a, b) => (b.rel - a.rel) || (Number(b.c.synced) - Number(a.c.synced)) || ((a.c.durationDiff ?? 999) - (b.c.durationDiff ?? 999)))
+      .map((x) => x.c)
+      .slice(0, 14);
+  }
+
+  ipcMain.handle(IPC_CHANNELS.LYRICS_CANDIDATES, async (event, artist: string, title: string, duration?: number, customQuery?: string) => {
+    assertMainRenderer(event, mainWindow);
+    if (typeof artist !== 'string' || typeof title !== 'string' || artist.length > 500 || title.length > 500) throw new Error('Invalid lyrics query');
+    const dur = (typeof duration === 'number' && Number.isFinite(duration) && duration > 1 && duration < 24 * 3600) ? duration : undefined;
+    let query = typeof customQuery === 'string' && customQuery.trim() ? customQuery.trim().slice(0, 300) : '';
+    const parsed = parseSoundCloudTrack(artist, title);
+    if (!query) {
+      const p0 = parsed[0] || { artist: cleanLyricsArtist(artist), title: cleanLyricsTitle(title) };
+      query = `${p0.artist} ${p0.title}`.trim();
+    }
+    // A title-only query catches uploads whose uploader is not the real artist.
+    const altQuery = parsed[0] && !customQuery ? parsed[0].title : '';
+    // What the user typed is the truth about what they want; otherwise the parse is.
+    const wanted: LyricsQuery[] = customQuery && customQuery.trim()
+      ? [{ artist: query, title: query }]
+      : (parsed.length ? parsed : [{ artist: query, title: query }]);
+    return collectLyricsCandidates(query, dur, altQuery, wanted);
+  });
+
+  // Per-track memory: the lyrics the user picked and their sync offset (ms).
+  const LYRICS_PREF_CAP = 200;
+  ipcMain.handle(IPC_CHANNELS.LYRICS_PREF, async (event, action: string, key: string, value?: unknown) => {
+    assertMainRenderer(event, mainWindow);
+    if (typeof key !== 'string' || !key || key.length > 600) throw new Error('Invalid lyrics key');
+    const prefs = ((store as any).get('lyricsPrefs') || {}) as Record<string, { choice?: any; offset?: number }>;
+    if (action === 'get') return prefs[key] || null;
+    const entry = prefs[key] || {};
+    if (action === 'setOffset') {
+      if (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) > 60000) throw new Error('Invalid offset');
+      if (value === 0) delete entry.offset; else entry.offset = Math.round(value);
+    } else if (action === 'setChoice') {
+      if (value === null) delete entry.choice;
+      else {
+        const v = value as { lyrics?: unknown; syncedLyrics?: unknown; source?: unknown };
+        if (!v || typeof v.lyrics !== 'string' || v.lyrics.length > 200000 ||
+            (v.syncedLyrics !== undefined && (typeof v.syncedLyrics !== 'string' || v.syncedLyrics.length > 300000))) throw new Error('Invalid lyrics choice');
+        entry.choice = { lyrics: v.lyrics, syncedLyrics: v.syncedLyrics, source: typeof v.source === 'string' ? v.source.slice(0, 30) : 'manual' };
+      }
+    } else {
+      throw new Error('Unknown lyrics pref action');
+    }
+    delete prefs[key];
+    if (entry.choice || entry.offset) prefs[key] = entry;
+    const keys = Object.keys(prefs);
+    for (let i = 0; i < keys.length - LYRICS_PREF_CAP; i++) delete prefs[keys[i]];
+    (store as any).set('lyricsPrefs', prefs);
+    return prefs[key] || null;
+  });
+
   ipcMain.handle(IPC_CHANNELS.LYRICS_FETCH, async (event, artist: string, title: string, duration?: number) => {
     assertMainRenderer(event, mainWindow);
     if (typeof artist !== 'string' || typeof title !== 'string' || artist.length > 500 || title.length > 500) throw new Error('Invalid lyrics query');
@@ -1125,41 +1415,8 @@ export function setupIPC(mainWindow: BrowserWindow): void {
     const cacheKey = (artist + '|' + title + (dur ? '|d' + Math.round(dur) : '')).toLowerCase();
     if (lyricsCache.has(cacheKey)) return lyricsCache.get(cacheKey);
 
-    function clean(t: string): string {
-      return t
-        .replace(/\s*[\(\[][^)\]]*(?:official|audio|video|lyric|lyrics|visualizer|music video|hd|hq|4k|remix|edit|original mix|extended|prod\.?)[^)\]]*[\)\]]/gi, '')
-        .replace(/\s*(?:ft\.?|feat\.?|featuring)\s+.+$/i, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
-    function cleanArtist(a: string): string {
-      return a.replace(/\s*(?:ft\.?|feat\.?|featuring|&|,)\s+.+$/i, '').replace(/\s+/g, ' ').trim();
-    }
-
-    const variations: Array<{ artist: string; title: string }> = [];
-    const seen = new Set<string>();
-    function addVar(a: string, t: string) {
-      a = a.trim(); t = t.trim();
-      if (!a || !t) return;
-      const k = a.toLowerCase() + '|' + t.toLowerCase();
-      if (seen.has(k)) return;
-      seen.add(k);
-      variations.push({ artist: a, title: t });
-    }
-
-    if (title.includes(' - ')) {
-      const parts = title.split(' - ');
-      const splitArtist = parts[0].trim();
-      const splitTitle = parts.slice(1).join(' - ').trim();
-      addVar(splitArtist, clean(splitTitle));
-      addVar(cleanArtist(splitArtist), clean(splitTitle));
-      addVar(artist, clean(splitTitle));
-    }
-
-    addVar(cleanArtist(artist), clean(title));
-    addVar(artist, title);
-    addVar(artist, clean(title));
-    addVar(cleanArtist(artist), title);
+    const variations = parseSoundCloudTrack(artist, title);
+    if (!variations.length) variations.push({ artist: cleanLyricsArtist(artist), title: cleanLyricsTitle(title) || title });
 
     const v0 = variations[0] || { artist, title };
     const searchQ = v0.artist + ' ' + v0.title;
@@ -1178,6 +1435,8 @@ export function setupIPC(mainWindow: BrowserWindow): void {
       const lrclibSearchPromises = [
         `https://lrclib.net/api/search?q=${encodeURIComponent(searchQ)}`,
         `https://lrclib.net/api/search?track_name=${encodeURIComponent(v0.title)}&artist_name=${encodeURIComponent(v0.artist)}`,
+        ...variations.slice(1, 4).map(v => `https://lrclib.net/api/search?q=${encodeURIComponent(v.artist + ' ' + v.title)}`),
+        `https://lrclib.net/api/search?q=${encodeURIComponent(v0.title)}`,
       ].map(url =>
         fetchWithTimeout(url, LYRICS_TIMEOUT)
           .then(async resp => (resp.ok ? await resp.json() as LrclibEntry[] : []))
@@ -1187,11 +1446,11 @@ export function setupIPC(mainWindow: BrowserWindow): void {
       const [exactEntries, searchLists, netease, qqmusic] = await Promise.all([
         Promise.all(lrclibPromises),
         Promise.all(lrclibSearchPromises),
-        fetchNetease(searchQ, dur),
-        fetchQQMusic(searchQ, dur),
+        fetchNetease(searchQ, dur, variations),
+        fetchQQMusic(searchQ, dur, variations),
       ]);
 
-      const lrclib = pickLrclib(exactEntries.concat(...searchLists), dur);
+      const lrclib = pickLrclib(exactEntries.concat(...searchLists), dur, variations);
 
       const synced = [lrclib, netease, qqmusic].find(r => r && r.syncedLyrics);
       if (synced) { lyricsCache.set(cacheKey, synced); return synced; }
@@ -1205,20 +1464,29 @@ export function setupIPC(mainWindow: BrowserWindow): void {
       // --- Genius scrape ---
       const geniusPromise = (async (): Promise<{ lyrics: string; source: string } | null> => {
         try {
-          const searchResp = await fetchWithTimeout(
-            `https://genius.com/api/search/song?q=${encodeURIComponent(searchQ)}`,
-            LYRICS_TIMEOUT + 2000, { headers: { 'User-Agent': CHROME_UA } }
-          );
-          if (!searchResp.ok) return null;
-          const searchData = await searchResp.json() as { response?: { sections?: Array<{ hits?: Array<{ result?: { url?: string } }> }> } };
-          const hits = searchData.response?.sections?.[0]?.hits || [];
-          if (!hits.length || !hits[0].result?.url) return null;
-          const pageResp = await fetchWithTimeout(hits[0].result.url, LYRICS_TIMEOUT + 2000, {
-            headers: { 'User-Agent': CHROME_UA },
-          });
-          if (!pageResp.ok) return null;
-          const lyrics = extractGeniusLyrics(await pageResp.text());
-          return lyrics ? { lyrics, source: 'genius' } : null;
+          type GHit = { result?: { url?: string; title?: string; full_title?: string; primary_artist?: { name?: string } } };
+          const queries = Array.from(new Set(variations.slice(0, 3).map(v => `${v.artist} ${v.title}`).concat(v0.title)));
+          const lists = await Promise.all(queries.map(async (q) => {
+            try {
+              const r = await fetchWithTimeout(`https://genius.com/api/search/song?q=${encodeURIComponent(q)}`, LYRICS_TIMEOUT + 2000, { headers: { 'User-Agent': CHROME_UA } });
+              if (!r.ok) return [] as GHit[];
+              const d = await r.json() as { response?: { sections?: Array<{ hits?: GHit[] }> } };
+              return d.response?.sections?.[0]?.hits || [];
+            } catch { return [] as GHit[]; }
+          }));
+          const seenUrl = new Set<string>();
+          const ranked = ([] as GHit[]).concat(...lists)
+            .filter((h) => h.result?.url && !seenUrl.has(h.result.url) && !!seenUrl.add(h.result.url))
+            .map((h) => ({ h, m: matchScore(h.result?.title, h.result?.primary_artist?.name, variations) }))
+            .filter((x) => x.m > 0)
+            .sort((a, b) => b.m - a.m);
+          for (const { h } of ranked.slice(0, 2)) {
+            const pageResp = await fetchWithTimeout(h.result!.url!, LYRICS_TIMEOUT + 2000, { headers: { 'User-Agent': CHROME_UA } });
+            if (!pageResp.ok) continue;
+            const lyrics = extractGeniusLyrics(await pageResp.text());
+            if (lyrics) return { lyrics, source: 'genius' };
+          }
+          return null;
         } catch { return null; }
       })();
 
