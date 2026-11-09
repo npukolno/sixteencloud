@@ -9,6 +9,9 @@ const SOCKET_PREFIX = 'discord-ipc-';
 const MAX_SOCKET_INDEX = 9;
 const MAX_CANDIDATES = 96;
 const CONNECT_TIMEOUT_MS = 1500;
+// After the socket accepts us, arRPC (Vesktop) validates the app id against
+// Discord's API before answering READY; on a slow link that takes seconds.
+const READY_TIMEOUT_MS = 12000;
 const REQUEST_TIMEOUT_MS = 5000;
 
 const OPCodes = {
@@ -200,7 +203,7 @@ export class DiscordIpcClient extends EventEmitter {
         }
         resolve(ok);
       };
-      const timer = setTimeout(() => finish(false), CONNECT_TIMEOUT_MS);
+      let timer = setTimeout(() => finish(false), CONNECT_TIMEOUT_MS);
 
       const onData = (chunk: Buffer): void => {
         buffer = Buffer.concat([buffer, chunk]);
@@ -242,6 +245,8 @@ export class DiscordIpcClient extends EventEmitter {
 
       socket.once('connect', () => {
         socket.setNoDelay(true);
+        clearTimeout(timer);
+        timer = setTimeout(() => finish(false), READY_TIMEOUT_MS);
         socket.write(encode(OPCodes.HANDSHAKE, { v: 1, client_id: this.clientId }));
       });
       socket.on('data', onData);
