@@ -36,7 +36,12 @@ SixteenCloud wraps the SoundCloud web player in Electron and adds the parts a mu
 
 | Synced lyrics | Downloader |
 | :---: | :---: |
-| ![Synced lyrics](docs/screenshots/lyrics.jpg)<br>*Time-synced lyrics with auto-scroll* | ![Downloader](docs/screenshots/downloader.jpg)<br>*Queue, quality presets, output folder, history* |
+| ![Synced lyrics](docs/screenshots/lyrics.jpg)<br>*Full-screen synced lyrics over a blurred cover backdrop* | ![Downloader](docs/screenshots/downloader.jpg)<br>*Queue, quality presets, output folder, history* |
+
+### Player tools
+
+![Player tools](docs/screenshots/player.jpg)
+*Skip promoted tracks and previews, playback speed, sleep timer, notifications, ListenBrainz*
 
 ### Integrations and protection
 
@@ -47,9 +52,12 @@ SixteenCloud wraps the SoundCloud web player in Electron and adds the parts a mu
 ## Features
 
 - **Ad-free playback** — request filtering plus cosmetic cleanup of promoted content.
-- **Synced lyrics** — LRC from LRCLIB, NetEase and QQ; plain lyrics from Genius, Musixmatch, lyrics.ovh, AZLyrics, ChartLyrics and lyrist. Auto-scroll with a 3D roulette view.
+- **Synced lyrics** — LRC from LRCLIB, NetEase and QQ; plain lyrics from Genius, Musixmatch, lyrics.ovh, AZLyrics, ChartLyrics and lyrist. Smarter track matching, a sync-offset slider, an "other versions" picker and a blurred full-screen mode.
+- **Player tools** — skip promoted tracks and 30-second previews, playback speed, sleep timer, track-change notifications and ListenBrainz scrobbling.
+- **Accent from cover art** — the whole interface can take its colour from the playing track.
+- **Search shortcuts** — `/` or Ctrl+K focuses search; recent queries open as a dropdown.
 - **10-band equalizer** — Web Audio graph with presets, per-track persistence.
-- **Audio visualizer** — multiple modes, driven by the real analyser node, idle-friendly.
+- **Audio visualizer** — multiple modes, driven by the real analyser node, with a kick-reactive cover glow.
 - **Downloads** — tracks and playlists, HLS-aware, with a queue, progress and history.
 - **Discord Rich Presence** — current track, artist and artwork.
 - **Linux integration** — tray, MPRIS (`org.mpris.MediaPlayer2.sixteencloud`), media keys, desktop entry, notification controls.
@@ -65,21 +73,21 @@ Grab the latest asset from [Releases](https://github.com/npukolno/sixteencloud/r
 
 ### Windows
 
-Download **`SixteenCloud.Setup.3.0.1.exe`** and run it. The installer is per-user and does not require administrator rights. If SmartScreen warns about an unsigned publisher, choose **More info → Run anyway**.
+Download **`SixteenCloud.Setup.3.0.2.exe`** and run it. The installer is per-user and does not require administrator rights. If SmartScreen warns about an unsigned publisher, choose **More info → Run anyway**.
 
 ### Linux
 
 | Format | Install |
 | --- | --- |
-| **AppImage** | `chmod +x SixteenCloud.Setup.3.0.1.AppImage && ./SixteenCloud.Setup.3.0.1.AppImage` |
-| **Debian / Ubuntu** | `sudo dpkg -i SixteenCloud.Setup.3.0.1.deb` then `sudo apt -f install` if needed |
-| **Arch / pacman** | `sudo pacman -U SixteenCloud.Setup.3.0.1.pacman` |
+| **AppImage** | `chmod +x SixteenCloud.Setup.3.0.2.AppImage && ./SixteenCloud.Setup.3.0.2.AppImage` |
+| **Debian / Ubuntu** | `sudo dpkg -i SixteenCloud.Setup.3.0.2.deb` then `sudo apt -f install` if needed |
+| **Arch / pacman** | `sudo pacman -U SixteenCloud.Setup.3.0.2.pacman` |
 
 On Wayland, if the window does not appear, launch with `--ozone-platform=wayland` or run under XWayland.
 
 ### macOS
 
-Download **`SixteenCloud.Setup.3.0.1.zip`**, unzip and drag `SixteenCloud.app` to Applications. The build is unsigned and x86_64 only; clear the quarantine flag once:
+Download **`SixteenCloud.Setup.3.0.2.zip`**, unzip and drag `SixteenCloud.app` to Applications. The build is unsigned and x86_64 only; clear the quarantine flag once:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/SixteenCloud.app
@@ -95,7 +103,7 @@ xattr -dr com.apple.quarantine /Applications/SixteenCloud.app
 | Linux pacman | Not auto-installed by the app — update the package manually. |
 | macOS zip | Manual replacement (unsigned builds cannot self-install). |
 
-Updates are read from GitHub Releases of this repository. Older 2.x builds migrate to 3.0.1 through the same release feed.
+Updates are read from GitHub Releases of this repository. Older 2.x builds migrate to 3.0.2 through the same release feed.
 
 ## Build from source
 
