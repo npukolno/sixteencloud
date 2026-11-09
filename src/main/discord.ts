@@ -76,6 +76,7 @@ async function connectRPC(): Promise<void> {
   if (!ok || !client.isConnected) {
     client.disconnect();
     lastError = t('discord.not_running');
+    logInfo('[Discord RPC] no endpoint answered, retrying');
     sendState();
     scheduleRetry();
     return;
