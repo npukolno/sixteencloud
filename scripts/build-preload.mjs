@@ -14,7 +14,7 @@ import path from 'path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const entries = ['src/preload/preload.ts', 'src/preload/mini-preload.ts'];
+const entries = ['src/preload/preload.ts', 'src/preload/mini-preload.ts', 'src/preload/auth-preload.ts'];
 
 for (const entry of entries) {
   const outfile = path.join(root, 'dist/preload', path.basename(entry).replace(/\.ts$/, '.js'));

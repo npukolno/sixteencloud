@@ -9,7 +9,7 @@ import { APP_NAME, IPC_CHANNELS } from '../shared/constants';
 import { TrackInfo } from '../shared/types';
 import { logInfo, logWarn } from './logger';
 import { isAllowedMediaUrl, isTrustedSoundCloudUrl } from '../shared/security';
-import { readResponseBuffer } from './ipc';
+import { readResponseBuffer, getStore } from './ipc';
 
 type MprisPlaybackStatus = 'Playing' | 'Paused' | 'Stopped';
 
@@ -391,6 +391,9 @@ function createBrandedNotificationIcon(trackImage: NativeImage): NativeImage {
 
 async function notifyTrackSwitch(win: BrowserWindow, info: TrackInfo, artwork: ArtworkAsset): Promise<void> {
   if (!Notification.isSupported()) return;
+  // Same rules as the in-app setting: only when enabled and the app is in the background.
+  try { if (!(getStore() as any).get('player.notifications')) return; } catch { return; }
+  if (win.isFocused()) return;
 
   const icon = createBrandedNotificationIcon(artwork.image);
   const trackTitle = (info.title || '').trim() || 'Unknown Track';

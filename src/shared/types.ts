@@ -106,6 +106,7 @@ export interface StoreSchema {
     startMinimized: boolean;
     launchOnStartup: boolean;
     accentColor: string;
+    dynamicAccent: boolean;
     autoUpdate: boolean;
     keybinds: Record<string, string>;
   };
@@ -117,6 +118,24 @@ export interface StoreSchema {
   };
   lyrics: {
     fontSize: number;
+  };
+  player: {
+    skipPromoted: boolean;
+    skipPreviews: boolean;
+    notifications: boolean;
+    scrobble: boolean;
+    speed: number;
+  };
+  searchHistory: string[];
+  wave: {
+    moods: string[];
+    tag: string;
+    lang: string;
+    explore: number;
+    avoidHeard: boolean;
+    artists: Record<string, number>;
+    tags: Record<string, number>;
+    seen: string[];
   };
   themes: {
     active: string;

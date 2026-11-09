@@ -159,3 +159,28 @@ export function applyUserAgentHeaders(headers: Record<string, any>): boolean {
 
   return changed;
 }
+
+// ---------------------------------------------------------------------------
+// Sign-in windows (Google). Google's "this browser or app may not be secure"
+// check rejects embedded Chromium even with a perfect Chrome identity, but it
+// accepts Firefox, which is not an embedding framework it fingerprints. Auth
+// windows therefore present as Firefox everywhere: UA, headers (no client
+// hints, Firefox sends none) and the JS-visible navigator (auth-preload).
+// ---------------------------------------------------------------------------
+
+const FIREFOX_VERSION = '147.0';
+
+export const FIREFOX_UA = (() => {
+  const gecko = `Gecko/20100101 Firefox/${FIREFOX_VERSION}`;
+  if (platform === 'win32') return `Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:${FIREFOX_VERSION}) ${gecko}`;
+  if (platform === 'darwin') return `Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:${FIREFOX_VERSION}) ${gecko}`;
+  return `Mozilla/5.0 (X11; Linux x86_64; rv:${FIREFOX_VERSION}) ${gecko}`;
+})();
+
+/** Rewrite request headers to the Firefox identity: Firefox sends no client hints. */
+export function applyFirefoxHeaders(headers: Record<string, any>): void {
+  setHeader(headers, 'User-Agent', FIREFOX_UA);
+  for (const key of Object.keys(headers)) {
+    if (key.toLowerCase().startsWith('sec-ch-')) delete headers[key];
+  }
+}

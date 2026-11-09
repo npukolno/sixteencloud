@@ -22,6 +22,23 @@ export function getLyricsOverlayHTML(): string {
         </div>
       </div>
 
+      <div class="sc-overlay-group sc-lyr-tools">
+        <div class="sc-lyr-row">
+          <span class="sc-overlay-label" style="margin:0">${t('lyrics.offset')}</span>
+          <div class="sc-lyr-offset">
+            <button class="sc-overlay-btn sc-overlay-btn-secondary" id="sc-lyr-off-minus" aria-label="-0.5s">&minus;</button>
+            <span id="sc-lyr-off-val">0.0s</span>
+            <button class="sc-overlay-btn sc-overlay-btn-secondary" id="sc-lyr-off-plus" aria-label="+0.5s">+</button>
+            <button class="sc-overlay-btn sc-overlay-btn-secondary" id="sc-lyr-off-reset" aria-label="${t('settings.reset')}">&#8634;</button>
+          </div>
+        </div>
+        <div class="sc-lyr-row">
+          <button class="sc-overlay-btn sc-overlay-btn-secondary" id="sc-lyr-other">${t('lyrics.other_versions')}</button>
+          <button class="sc-overlay-btn sc-overlay-btn-secondary" id="sc-lyr-fs">${t('lyrics.fullscreen')}</button>
+        </div>
+        <div id="sc-lyr-picker" style="display:none"></div>
+      </div>
+
       <div id="sc-lyrics-content">
         <div class="sc-lyrics-placeholder">${t('lyrics.placeholder')}</div>
       </div>
@@ -34,6 +51,8 @@ export function getLyricsOverlayHTML(): string {
 export function getLyricsOverlayScript(): string {
   const _tr = JSON.stringify(getScriptTranslations([
     'lyrics.searching', 'lyrics.not_found', 'lyrics.fetch_failed',
+    'lyrics.search_versions', 'lyrics.use_this', 'lyrics.reset_choice', 'lyrics.no_versions',
+    'lyrics.synced', 'lyrics.plain', 'lyrics.query_placeholder', 'lyrics.chosen',
   ]));
   return `
     (function() {
@@ -52,6 +71,17 @@ export function getLyricsOverlayScript(): string {
       var content = panel.querySelector('#sc-lyrics-content');
       var fontSlider = panel.querySelector('#sc-lyrics-fontsize');
       var fontVal = panel.querySelector('#sc-lyrics-fontsize-val');
+      var offVal = panel.querySelector('#sc-lyr-off-val');
+      var pickerEl = panel.querySelector('#sc-lyr-picker');
+
+      var offsetMs = 0;
+      var curPrefKey = '';
+      var curArtist = '';
+      var curTitle = '';
+      var curDur;
+      var curResult = null;
+      var fsOpen = false;
+      var fsEl = null;
 
       api.storeGet('lyrics.fontSize').then(function(size) {
         if (size) {
@@ -101,19 +131,24 @@ export function getLyricsOverlayScript(): string {
       // Session metadata for whatever is playing, on every page. The player
       // badge is the fallback (it disappears on the standby/crossfade layout).
       function readNowPlaying() {
+        // The player badge is what the user sees and hears. The Media Session
+        // metadata can lag or be rewritten by the page (after pause/resume it
+        // once carried another upload's artist), so it is only a fallback for
+        // layouts without a badge.
+        var titleEl = document.querySelector('.playbackSoundBadge__titleLink');
+        if (titleEl) {
+          var artistEl = document.querySelector('.playbackSoundBadge__lightLink');
+          var badgeTitle = readBadgeText(titleEl);
+          if (badgeTitle) return { title: badgeTitle, artist: stripHandle(artistEl ? readBadgeText(artistEl) : '') };
+        }
         try {
           var md = navigator.mediaSession && navigator.mediaSession.metadata;
           if (md) {
             var mdTitle = (md.title || '').trim();
             if (mdTitle) return { title: mdTitle, artist: stripHandle(md.artist || '') };
           }
-        } catch (e) { /* fall through to the badge */ }
-        var titleEl = document.querySelector('.playbackSoundBadge__titleLink');
-        if (!titleEl) return null;
-        var artistEl = document.querySelector('.playbackSoundBadge__lightLink');
-        var badgeTitle = readBadgeText(titleEl);
-        if (!badgeTitle) return null;
-        return { title: badgeTitle, artist: stripHandle(artistEl ? readBadgeText(artistEl) : '') };
+        } catch (e) { /* nothing playing */ }
+        return null;
       }
 
       var syncedLines = null;   // [{ t: seconds, text }]
@@ -231,14 +266,14 @@ export function getLyricsOverlayScript(): string {
 
       function startRoll() {
         stopRoll();
-        if (!syncedLines || !syncedLines.length || !isPanelActive()) return;
+        if (!syncedLines || !syncedLines.length || !isPanelVisible()) return;
         var step = function() {
           rollRaf = requestAnimationFrame(step);
           frames++;
           try {
           var au = window.__scAudioElement;
           if (!au || !isFinite(au.currentTime)) return;
-          var now = au.currentTime;
+          var now = au.currentTime + offsetMs / 1000;
           var arr = syncedLines;
           var k = -1;
           for (var i = 0; i < arr.length; i++) { if (arr[i].t <= now) k = i; else break; }
@@ -276,37 +311,261 @@ export function getLyricsOverlayScript(): string {
 
         var au = window.__scAudioElement;
         var dur = (au && isFinite(au.duration) && au.duration > 1) ? au.duration : undefined;
+        curArtist = artist; curTitle = title; curDur = dur;
+        curPrefKey = (artist + '|' + title).toLowerCase();
+        closePicker();
+        fsRender();
 
-        api.lyricsFetch(artist, title, dur).then(function(result) {
+        var prefP = (typeof api.lyricsPref === 'function')
+          ? api.lyricsPref('get', curPrefKey).catch(function() { return null; })
+          : Promise.resolve(null);
+        prefP.then(function(pref) {
           if (seq !== fetchSeq) return;
-          if (!result || !result.lyrics) {
-            dot.className = 'sc-overlay-status-dot red';
-            content.innerHTML = '<div style="color:var(--sc-text-subtle);text-align:center;padding:40px 0">' + _t('lyrics.not_found') + '</div>';
-            return;
-          }
-          var lines = result.syncedLyrics ? parseLrc(result.syncedLyrics) : null;
-          if (lines && lines.length >= 2) {
-            dot.className = 'sc-overlay-status-dot green';
-            renderSynced(lines);
-          } else {
-            dot.className = 'sc-overlay-status-dot green';
-            renderPlainLyrics(result.lyrics);
-          }
+          offsetMs = (pref && pref.offset) || 0;
+          updateOffsetLabel();
+          if (pref && pref.choice && pref.choice.lyrics) { applyResult(pref.choice); return; }
+          return api.lyricsFetch(artist, title, dur).then(function(result) {
+            if (seq !== fetchSeq) return;
+            applyResult(result);
+          });
         }).catch(function() {
           if (seq !== fetchSeq) return;
           dot.className = 'sc-overlay-status-dot red';
           content.innerHTML = '<div style="color:var(--sc-text-subtle);text-align:center;padding:40px 0">' + _t('lyrics.fetch_failed') + '</div>';
+          curResult = null;
+          fsRender();
         });
       }
+
+      function applyResult(result) {
+        curResult = result && result.lyrics ? result : null;
+        if (!curResult) {
+          dot.className = 'sc-overlay-status-dot red';
+          clearModes();
+          content.innerHTML = '<div style="color:var(--sc-text-subtle);text-align:center;padding:40px 0">' + _t('lyrics.not_found') + '</div>';
+          fsRender();
+          return;
+        }
+        dot.className = 'sc-overlay-status-dot green';
+        var lines = result.syncedLyrics ? parseLrc(result.syncedLyrics) : null;
+        if (lines && lines.length >= 2) renderSynced(lines);
+        else renderPlainLyrics(result.lyrics);
+        fsRender();
+      }
+
+      // ---- Sync offset (per track, remembered) ----
+      function updateOffsetLabel() {
+        var v = offsetMs / 1000;
+        offVal.textContent = (v > 0 ? '+' : '') + v.toFixed(1) + 's';
+      }
+      var offSaveTimer = null;
+      function changeOffset(delta, absolute) {
+        offsetMs = Math.max(-30000, Math.min(30000, absolute ? delta : offsetMs + delta));
+        updateOffsetLabel();
+        if (offSaveTimer) clearTimeout(offSaveTimer);
+        var key = curPrefKey, val = offsetMs;
+        offSaveTimer = setTimeout(function() {
+          offSaveTimer = null;
+          if (key && typeof api.lyricsPref === 'function') api.lyricsPref('setOffset', key, val).catch(function() {});
+        }, 400);
+      }
+      panel.querySelector('#sc-lyr-off-minus').addEventListener('click', function() { changeOffset(-500); });
+      panel.querySelector('#sc-lyr-off-plus').addEventListener('click', function() { changeOffset(500); });
+      panel.querySelector('#sc-lyr-off-reset').addEventListener('click', function() { changeOffset(0, true); });
+
+      // ---- Other versions picker ----
+      function closePicker() { pickerEl.style.display = 'none'; pickerEl.innerHTML = ''; }
+      function renderCandidates(listEl, items) {
+        if (!items || !items.length) {
+          listEl.innerHTML = '<div style="color:var(--sc-text-muted);padding:10px 0;font-size:12px">' + _t('lyrics.no_versions') + '</div>';
+          return;
+        }
+        listEl.innerHTML = '';
+        items.forEach(function(c) {
+          var row = document.createElement('div');
+          row.className = 'sc-lyr-cand';
+          var preview = String(c.lyrics || '').split(/\\r?\\n/).filter(Boolean).slice(0, 2).join(' / ');
+          row.innerHTML =
+            '<div class="sc-lyr-cand-main"><div class="sc-lyr-cand-label">' + esc(c.label) + '</div>' +
+            '<div class="sc-lyr-cand-meta">' + esc(c.source) + ' · ' + (c.synced ? _t('lyrics.synced') : _t('lyrics.plain')) +
+            (typeof c.durationDiff === 'number' ? ' · Δ' + c.durationDiff.toFixed(0) + 's' : '') + '</div>' +
+            '<div class="sc-lyr-cand-prev">' + esc(preview.slice(0, 110)) + '</div></div>';
+          var btn = document.createElement('button');
+          btn.className = 'sc-overlay-btn sc-overlay-btn-primary';
+          btn.textContent = _t('lyrics.use_this');
+          btn.addEventListener('click', function() {
+            var chosen = { lyrics: c.lyrics, syncedLyrics: c.syncedLyrics, source: c.source };
+            fetchSeq++;
+            applyResult(chosen);
+            if (curPrefKey && typeof api.lyricsPref === 'function') api.lyricsPref('setChoice', curPrefKey, chosen).catch(function() {});
+            closePicker();
+          });
+          row.appendChild(btn);
+          listEl.appendChild(row);
+        });
+      }
+      function runCandidateSearch(listEl, query) {
+        listEl.innerHTML = '<div style="color:var(--sc-text-muted);padding:10px 0;font-size:12px">' + _t('lyrics.searching') + '</div>';
+        var forKey = curPrefKey;
+        api.lyricsCandidates(curArtist, curTitle, curDur, query || undefined).then(function(items) {
+          if (forKey !== curPrefKey) return;
+          renderCandidates(listEl, items);
+        }).catch(function() { renderCandidates(listEl, []); });
+      }
+      panel.querySelector('#sc-lyr-other').addEventListener('click', function() {
+        if (!curPrefKey) return;
+        if (pickerEl.style.display !== 'none') { closePicker(); return; }
+        pickerEl.style.display = 'block';
+        pickerEl.innerHTML =
+          '<div class="sc-lyr-search"><input class="sc-overlay-input" id="sc-lyr-q" placeholder="' + esc(_t('lyrics.query_placeholder')) + '">' +
+          '<button class="sc-overlay-btn sc-overlay-btn-secondary" id="sc-lyr-q-go">' + esc(_t('lyrics.search_versions')) + '</button>' +
+          '<button class="sc-overlay-btn sc-overlay-btn-secondary" id="sc-lyr-q-reset">' + esc(_t('lyrics.reset_choice')) + '</button></div>' +
+          '<div id="sc-lyr-cands"></div>';
+        var q = pickerEl.querySelector('#sc-lyr-q');
+        var list = pickerEl.querySelector('#sc-lyr-cands');
+        q.value = '';
+        pickerEl.querySelector('#sc-lyr-q-go').addEventListener('click', function() { runCandidateSearch(list, q.value.trim()); });
+        q.addEventListener('keydown', function(e) { if (e.key === 'Enter') runCandidateSearch(list, q.value.trim()); });
+        pickerEl.querySelector('#sc-lyr-q-reset').addEventListener('click', function() {
+          if (curPrefKey && typeof api.lyricsPref === 'function') api.lyricsPref('setChoice', curPrefKey, null).catch(function() {});
+          lastTrack = '';
+          closePicker();
+          detectAndFetch();
+        });
+        runCandidateSearch(list, '');
+      });
+
+      // ---- Full-screen view ----
+      var fsTimer = null;
+      var fsLineEls = [];
+      var fsActive = -1;
+
+      function injectLyricsStyles() {
+        if (document.getElementById('sc-lyrics-extra-style')) return;
+        var st = document.createElement('style');
+        st.id = 'sc-lyrics-extra-style';
+        st.textContent =
+          '#sc-lyrics-fs{position:fixed;top:32px;left:0;right:0;bottom:48px;z-index:99990;display:none;overflow:hidden;background:#0b0b0d;color:#fff;font-family:inherit}' +
+          '#sc-lyrics-fs.open{display:block;animation:scFsIn .35s ease both}' +
+          '@keyframes scFsIn{from{opacity:0}to{opacity:1}}' +
+          '#sc-lyrics-fs .sc-fs-bg{position:absolute;inset:-60px;background-size:cover;background-position:center;filter:blur(60px) saturate(1.5) brightness(.5);transform:scale(1.15);transition:background-image .6s}' +
+          '#sc-lyrics-fs .sc-fs-shade{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(0,0,0,.05),rgba(0,0,0,.55))}' +
+          '#sc-lyrics-fs .sc-fs-head{position:absolute;left:36px;top:24px;right:90px;z-index:2;text-shadow:0 2px 12px rgba(0,0,0,.5)}' +
+          '#sc-lyrics-fs .sc-fs-title{font-size:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+          '#sc-lyrics-fs .sc-fs-artist{font-size:14px;opacity:.7;margin-top:2px}' +
+          '#sc-lyrics-fs .sc-fs-close{position:absolute;right:24px;top:20px;z-index:3;width:38px;height:38px;border-radius:50%;border:0;background:rgba(255,255,255,.14);color:#fff;font-size:20px;cursor:pointer}' +
+          '#sc-lyrics-fs .sc-fs-close:hover{background:rgba(255,255,255,.26)}' +
+          '#sc-lyrics-fs .sc-fs-body{position:absolute;inset:0;overflow-y:auto;padding:30vh 8vw;text-align:center;scrollbar-width:none;z-index:1}' +
+          '#sc-lyrics-fs .sc-fs-body::-webkit-scrollbar{display:none}' +
+          '#sc-lyrics-fs .sc-fs-line{font-size:clamp(24px,3.6vw,48px);font-weight:800;line-height:1.25;margin:.55em 0;color:rgba(255,255,255,.3);cursor:pointer;transition:color .35s,transform .35s,filter .35s;transform:scale(.94);filter:blur(1.2px)}' +
+          '#sc-lyrics-fs .sc-fs-line:hover{color:rgba(255,255,255,.55)}' +
+          '#sc-lyrics-fs .sc-fs-line.active{color:#fff;transform:scale(1);filter:none;text-shadow:0 0 28px rgba(var(--sc-accent-rgb,255,85,0),.55)}' +
+          '#sc-lyrics-fs .sc-fs-plain{white-space:pre-wrap;font-size:clamp(18px,2.2vw,28px);font-weight:600;line-height:1.6;color:rgba(255,255,255,.9)}' +
+          '#sc-lyrics-fs .sc-fs-msg{opacity:.6;font-size:18px;margin-top:20vh}' +
+          '.sc-lyr-tools .sc-lyr-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}' +
+          '.sc-lyr-offset{display:flex;align-items:center;gap:6px}.sc-lyr-offset span{min-width:46px;text-align:center;font-size:12px;color:var(--sc-text-muted)}' +
+          '.sc-lyr-search{display:flex;gap:6px;margin:6px 0}.sc-lyr-search input{flex:1;min-width:0}' +
+          '#sc-lyr-cands{max-height:280px;overflow-y:auto}' +
+          '.sc-lyr-cand{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--sc-border,rgba(255,255,255,.08))}' +
+          '.sc-lyr-cand-main{flex:1;min-width:0}.sc-lyr-cand-label{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+          '.sc-lyr-cand-meta{font-size:11px;color:var(--sc-text-muted)}.sc-lyr-cand-prev{font-size:11px;color:var(--sc-text-subtle,#777);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}';
+        document.head.appendChild(st);
+      }
+      injectLyricsStyles();
+
+      function ensureFs() {
+        if (fsEl) return fsEl;
+        fsEl = document.createElement('div');
+        fsEl.id = 'sc-lyrics-fs';
+        fsEl.setAttribute('role', 'dialog');
+        fsEl.setAttribute('aria-modal', 'true');
+        fsEl.innerHTML = '<div class="sc-fs-bg"></div><div class="sc-fs-shade"></div><button class="sc-fs-close" aria-label="Close">&#10005;</button>' +
+          '<div class="sc-fs-head"><div class="sc-fs-title"></div><div class="sc-fs-artist"></div></div><div class="sc-fs-body"></div>';
+        document.body.appendChild(fsEl);
+        fsEl.querySelector('.sc-fs-close').addEventListener('click', closeFs);
+        return fsEl;
+      }
+
+      function fsRender() {
+        if (!fsOpen || !fsEl) return;
+        var art = typeof window.__scFindArtwork === 'function' ? window.__scFindArtwork() : null;
+        if (art) fsEl.querySelector('.sc-fs-bg').style.backgroundImage = 'url("' + art + '")';
+        fsEl.querySelector('.sc-fs-title').textContent = curTitle;
+        fsEl.querySelector('.sc-fs-artist').textContent = curArtist;
+        var body = fsEl.querySelector('.sc-fs-body');
+        body.scrollTop = 0;
+        fsLineEls = [];
+        fsActive = -1;
+        if (!curResult) { body.innerHTML = '<div class="sc-fs-msg">' + esc(_t('lyrics.not_found')) + '</div>'; return; }
+        if (syncedLines && syncedLines.length) {
+          var html = '';
+          for (var i = 0; i < syncedLines.length; i++) html += '<div class="sc-fs-line" data-i="' + i + '">' + esc(syncedLines[i].text) + '</div>';
+          body.innerHTML = html;
+          fsLineEls = Array.prototype.slice.call(body.querySelectorAll('.sc-fs-line'));
+          fsLineEls.forEach(function(el) {
+            el.addEventListener('click', function() {
+              var au = window.__scAudioElement;
+              var line = syncedLines[Number(el.getAttribute('data-i'))];
+              if (au && line) au.currentTime = Math.max(0, line.t - offsetMs / 1000);
+            });
+          });
+        } else {
+          body.innerHTML = '<div class="sc-fs-plain">' + esc(curResult.lyrics) + '</div>';
+        }
+      }
+
+      function fsTick() {
+        if (!fsOpen || !fsLineEls.length) return;
+        var au = window.__scAudioElement;
+        if (!au || !isFinite(au.currentTime)) return;
+        var now = au.currentTime + offsetMs / 1000, k = -1;
+        for (var i = 0; i < syncedLines.length; i++) { if (syncedLines[i].t <= now) k = i; else break; }
+        if (k === fsActive) return;
+        if (fsActive >= 0 && fsLineEls[fsActive]) fsLineEls[fsActive].classList.remove('active');
+        fsActive = k;
+        if (k >= 0 && fsLineEls[k]) {
+          var el = fsLineEls[k];
+          el.classList.add('active');
+          var body = fsEl.querySelector('.sc-fs-body');
+          body.scrollTo({ top: el.offsetTop - body.clientHeight / 2 + el.clientHeight / 2, behavior: 'smooth' });
+        }
+      }
+
+      function openFs() {
+        ensureFs();
+        fsOpen = true;
+        if (typeof window.__scCloseOverlay === 'function') window.__scCloseOverlay();
+        fsEl.classList.add('open');
+        fsRender();
+        if (!fsTimer) fsTimer = setInterval(fsTick, 120);
+        startPolling();
+      }
+      function closeFs() {
+        fsOpen = false;
+        if (fsEl) fsEl.classList.remove('open');
+        if (fsTimer) { clearInterval(fsTimer); fsTimer = null; }
+        if (!isPanelActive()) stopPolling();
+      }
+      window.__scLyricsToggleFs = function() { if (fsOpen) closeFs(); else openFs(); };
+      panel.querySelector('#sc-lyr-fs').addEventListener('click', openFs);
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && fsOpen) { e.stopPropagation(); closeFs(); } }, true);
+
+      // A new track should replace the lyrics at once, not on the next 3s poll.
+      (function hookTrackEvents() {
+        if (window.__scPlayer) window.__scPlayer.on('track', function() { if (isPanelActive()) setTimeout(function() { try { detectAndFetch(); } catch (e) {} }, 250); });
+        else setTimeout(hookTrackEvents, 1000);
+      })();
 
       // Lyrics are only useful while their panel is visible. Keep no timer alive
       // for hidden sections/windows and resume with an immediate detection.
       var pollTimer = null;
       var polling = false;
-      function isPanelActive() {
+      function isPanelVisible() {
         var container = document.getElementById('sc-overlay-container');
         return !document.hidden && panel.classList.contains('active') && !!(container && container.classList.contains('open'));
       }
+      // Lyrics keep updating while the full-screen view is open, even with the sheet closed.
+      function isPanelActive() { return isPanelVisible() || (fsOpen && !document.hidden); }
       function stopPolling() {
         polling = false;
         stopRoll();
@@ -333,6 +592,15 @@ export function getLyricsOverlayScript(): string {
         if (isPanelActive()) startPolling(); else stopPolling();
       });
       sectionObserver.observe(panel, { attributes: true, attributeFilter: ['class'] });
+      // Reopening the sheet changes the container's class, not the panel's:
+      // without this, lyrics stayed on whatever track was playing at close time.
+      (function watchContainer() {
+        var container = document.getElementById('sc-overlay-container');
+        if (!container) { setTimeout(watchContainer, 500); return; }
+        new MutationObserver(function() {
+          if (isPanelActive()) startPolling(); else stopPolling();
+        }).observe(container, { attributes: true, attributeFilter: ['class'] });
+      })();
       document.addEventListener('visibilitychange', function() {
         if (isPanelActive()) startPolling(); else stopPolling();
       });
