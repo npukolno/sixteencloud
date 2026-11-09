@@ -54,6 +54,46 @@
     });
   });
 
+  // Lightbox: click the active screenshot to enlarge it; arrows switch, Esc / click closes.
+  const lightbox = document.createElement("div");
+  lightbox.className = "lightbox";
+  lightbox.setAttribute("role", "dialog");
+  lightbox.setAttribute("aria-modal", "true");
+  lightbox.setAttribute("aria-label", "Screenshot preview");
+  lightbox.hidden = true;
+  lightbox.innerHTML = '<button class="lightbox-close" type="button" aria-label="Close">&times;</button><img class="lightbox-img" alt="">';
+  document.body.appendChild(lightbox);
+  const lbImg = lightbox.querySelector(".lightbox-img");
+  let lbIndex = 0;
+  const lbShow = (index) => {
+    lbIndex = (index + shots.length) % shots.length;
+    lbImg.src = shots[lbIndex].currentSrc || shots[lbIndex].src;
+    lbImg.alt = shots[lbIndex].alt;
+    selectScreen(lbIndex);
+  };
+  const lbOpen = (index) => {
+    lbShow(index);
+    lightbox.hidden = false;
+    document.body.classList.add("lightbox-open");
+    lightbox.querySelector(".lightbox-close").focus();
+  };
+  const lbClose = () => {
+    lightbox.hidden = true;
+    document.body.classList.remove("lightbox-open");
+  };
+  shots.forEach((shot, i) => {
+    shot.addEventListener("click", () => lbOpen(i));
+  });
+  lightbox.addEventListener("click", (event) => {
+    if (event.target !== lbImg) lbClose();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (lightbox.hidden) return;
+    if (event.key === "Escape") lbClose();
+    if (event.key === "ArrowRight") lbShow(lbIndex + 1);
+    if (event.key === "ArrowLeft") lbShow(lbIndex - 1);
+  });
+
   const osTabs = Array.from(document.querySelectorAll(".os-tab"));
   const osPanels = Array.from(document.querySelectorAll(".os-panel"));
 
