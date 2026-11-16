@@ -1,5 +1,6 @@
 import { app } from 'electron';
 import { t, getScriptTranslations } from '../../shared/i18n';
+import { defaultKeybinds } from '../../shared/keybinds';
 
 export function getSettingsOverlayHTML(): string {
   return `
@@ -66,6 +67,10 @@ export function getSettingsOverlayHTML(): string {
             <button class="sc-overlay-badge sc-keybind-btn" type="button" data-action="sidebar"></button>
           </div>
           <div class="sc-overlay-list-item">
+            <span class="sc-overlay-list-item-title">${t('settings.toggle_rail')}</span>
+            <button class="sc-overlay-badge sc-keybind-btn" type="button" data-action="rail"></button>
+          </div>
+          <div class="sc-overlay-list-item">
             <span class="sc-overlay-list-item-title">${t('settings.play_pause')}</span>
             <button class="sc-overlay-badge sc-keybind-btn" type="button" data-action="playPause"></button>
           </div>
@@ -111,8 +116,33 @@ export function getSettingsOverlayHTML(): string {
             <div class="sc-custom-dropdown-item" data-value="above">${t('settings.viz_above')}</div>
             <div class="sc-custom-dropdown-item" data-value="wave">${t('settings.viz_wave')}</div>
             <div class="sc-custom-dropdown-item" data-value="glow">${t('settings.viz_glow')}</div>
+            <div class="sc-custom-dropdown-item" data-value="scope">${t('settings.viz_scope')}</div>
+            <div class="sc-custom-dropdown-item" data-value="ambient">${t('settings.viz_ambient')}</div>
+            <div class="sc-custom-dropdown-item" data-value="led">${t('settings.viz_led')}</div>
+            <div class="sc-custom-dropdown-item" data-value="spectrogram">${t('settings.viz_spectrogram')}</div>
           </div>
         </div>
+        <div class="sc-overlay-toggle" style="margin-top: 10px;">
+          <div>
+            <span class="sc-overlay-toggle-label">${t('settings.viz_lyrics_ring')}</span>
+            <div style="font-size:11px;opacity:.6;margin-top:2px;">${t('settings.viz_lyrics_ring_desc')}</div>
+          </div>
+          <label class="sc-overlay-switch">
+            <input type="checkbox" id="sc-set-viz-lyrics-ring" checked>
+            <span class="sc-overlay-switch-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="sc-overlay-toggle" style="margin-top: 16px;">
+        <div>
+          <span class="sc-overlay-toggle-label">${t('settings.battery_saver')}</span>
+          <div style="font-size:11px;opacity:.6;margin-top:2px;">${t('settings.battery_saver_desc')}</div>
+        </div>
+        <label class="sc-overlay-switch">
+          <input type="checkbox" id="sc-set-battery-saver" checked>
+          <span class="sc-overlay-switch-slider"></span>
+        </label>
       </div>
 
       <div class="sc-overlay-toggle" style="margin-top: 16px;">
@@ -198,6 +228,8 @@ export function getSettingsOverlayScript(): string {
       const visualizerTypeMenu = panel.querySelector('#sc-set-visualizer-type-menu');
       const visualizerTypeItems = panel.querySelectorAll('.sc-custom-dropdown-item');
       const autoUpdate = panel.querySelector('#sc-set-autoupdate');
+      const batterySaver = panel.querySelector('#sc-set-battery-saver');
+      const lyricsRing = panel.querySelector('#sc-set-viz-lyrics-ring');
       const checkUpdateBtn = panel.querySelector('#sc-set-check-update');
       const updateStatus = panel.querySelector('#sc-set-update-status');
 
@@ -254,6 +286,7 @@ export function getSettingsOverlayScript(): string {
       // Visualizer is on by default; only an explicit false disables it.
       api.storeGet('visualizer').then(function(v) {
         visualizer.checked = !v || v.enabled !== false;
+        lyricsRing.checked = !v || v.lyricsRing !== false;
         const vizType = (v && v.type) || 'side';
         currentVisualizerType = vizType;
 
@@ -278,6 +311,15 @@ export function getSettingsOverlayScript(): string {
         });
       });
 
+      lyricsRing.addEventListener('change', function() {
+        api.storeGet('visualizer').then(function(v) {
+          var state = Object.assign({ enabled: true, type: 'side', version: 2 }, v || {});
+          state.lyricsRing = lyricsRing.checked;
+          api.storeSet('visualizer', state);
+          if (typeof window.__scVizSetLyricsRing === 'function') window.__scVizSetLyricsRing(state.lyricsRing);
+        });
+      });
+
       // Load settings
       api.storeGet('settings').then(function(s) {
         if (!s) return;
@@ -290,6 +332,7 @@ export function getSettingsOverlayScript(): string {
         accentGroup.style.display = dynAccent.checked ? 'none' : '';
         if (!dynAccent.checked) window.scApplyAccent(_hsvToHex(_hsv.h, _hsv.s, _hsv.v));
         autoUpdate.checked = s.autoUpdate !== false;
+        batterySaver.checked = s.batterySaver !== false;
       });
 
       dynAccent.addEventListener('change', function() {
@@ -443,6 +486,10 @@ export function getSettingsOverlayScript(): string {
         api.storeSet('settings.autoUpdate', autoUpdate.checked);
       });
 
+      batterySaver.addEventListener('change', function() {
+        api.storeSet('settings.batterySaver', batterySaver.checked);
+      });
+
       var downloadBtn = panel.querySelector('#sc-set-download-update');
       var progressWrap = panel.querySelector('#sc-set-update-progress');
       var progressFill = panel.querySelector('#sc-set-update-progress-fill');
@@ -499,13 +546,7 @@ export function getSettingsOverlayScript(): string {
 
       // Keyboard shortcuts: click a badge, press the new combination.
       var isMac = ${process.platform === 'darwin'};
-      var KEYBIND_DEFAULTS = {
-        sidebar: 'Ctrl+KeyB',
-        playPause: 'Space',
-        volumeUp: 'Ctrl+ArrowUp',
-        volumeDown: 'Ctrl+ArrowDown',
-        miniPlayer: isMac ? 'Meta+KeyP' : 'Ctrl+KeyP'
-      };
+      var KEYBIND_DEFAULTS = ${JSON.stringify(defaultKeybinds(process.platform))};
       var keybinds = {};
       var capturingAction = null;
       var hintEl = panel.querySelector('#sc-keybind-hint');

@@ -13,7 +13,7 @@ export function getVisualizerScript(): string {
       var MAX_COLS = 256;
       var canvas = null;
       var enabled = true;
-      var vizType = 'side'; // 'side' | 'above' | 'wave' | 'glow'
+      var vizType = 'side'; // VISUALIZER_TYPES in shared/constants.ts
       var raf = 0;
       var lastArtwork = null;
       var lastPoll = 0;
@@ -338,6 +338,19 @@ export function getVisualizerScript(): string {
       var waveNativeStyled = false;
       var waveColorKey = '';
 
+      // Free space beside SoundCloud's own controls in the player bar. Side
+      // groups go there when it is wide enough; otherwise they sit just above
+      // the bar instead of covering the buttons.
+      function gutterFit(W) {
+        var margin = clamp(W * 0.012, 6, 20);
+        var el = document.querySelector('.playControls__elements');
+        if (!el) return { inBar: W >= 1100, margin: margin, groupW: clamp(W * 0.22, 70, 230) };
+        var r = el.getBoundingClientRect();
+        var room = Math.min(r.left, W - r.right) - margin * 2;
+        if (room < 56) return { inBar: false, margin: margin, groupW: clamp(W * 0.22, 70, 230) };
+        return { inBar: true, margin: margin, groupW: Math.min(230, room) };
+      }
+
       function drawSide(now) {
         if (!ensureCanvas()) return;
         var bar = playerBar();
@@ -345,7 +358,8 @@ export function getVisualizerScript(): string {
 
         var barRect = bar.getBoundingClientRect();
         var W = Math.min(window.innerWidth, document.documentElement.clientWidth || window.innerWidth);
-        var narrow = W < 1100;
+        var fit = gutterFit(W);
+        var narrow = !fit.inBar;
         var H = narrow ? 32 : barRect.height;
         var dpr = Math.min(2, window.devicePixelRatio || 1);
 
@@ -356,8 +370,8 @@ export function getVisualizerScript(): string {
           canvas.style.height = H + 'px';
         }
 
-        // On a narrow window the control bar has no free gutters: lift the
-        // bars just above it instead of drawing over the buttons.
+        // Without free gutters beside the controls, lift the bars just above
+        // the bar instead of drawing over the buttons.
         canvas.style.top = (narrow ? Math.max(0, barRect.top - H - 4) : barRect.top) + 'px';
         canvas.style.left = '0';
         canvas.style.transform = '';
@@ -382,9 +396,10 @@ export function getVisualizerScript(): string {
         ctx.clearRect(0, 0, W, H);
         ctx.fillStyle = grad;
 
-        // Scale to the window: bars never crowd the centre or clip at the edges.
-        var margin = clamp(W * 0.015, 8, 26);
-        var groupW = clamp(W * 0.22, 70, 230);
+        // Scale to the free space beside the controls: bars never cover the
+        // buttons, crowd the centre or clip at the edges.
+        var margin = fit.margin;
+        var groupW = fit.groupW;
         var unit = groupW / (nb * 2);
         var gap = Math.max(2, unit * 0.45);
         var bw = Math.max(2, Math.min(6, unit - gap));
@@ -569,7 +584,9 @@ export function getVisualizerScript(): string {
         return glowLayer;
       }
 
-      function drawGlow(now) {
+      // Kick detector shared by the cover glow, the window edge glow and the
+      // lyrics ring: 0..1, jumps on every knock and decays smoothly.
+      function bassPulse() {
         var analyser = activeAnalyser || window.__scAudioAnalyser || window.__scVizAnalyser;
         var bass = 0;
         if (analyser) {
@@ -601,6 +618,26 @@ export function getVisualizerScript(): string {
           bass = clamp(base * 0.5 + kickLevel * 0.75, 0, 1);
         }
         glowBass = bass;
+        return bass;
+      }
+
+      function easePalette() {
+        for (var c = 0; c < 3; c++) {
+          for (var ch = 0; ch < 3; ch++) current[c][ch] += (wanted[c][ch] - current[c][ch]) * 0.07;
+        }
+      }
+
+      // One kick reading per frame: the detector compares against the previous
+      // call, so a second caller in the same frame would only ever see zero.
+      var pulseAt = -1;
+      var pulseValue = 0;
+      function framePulse(now) {
+        if (pulseAt !== now) { pulseAt = now; pulseValue = bassPulse(); }
+        return pulseValue;
+      }
+
+      function drawGlow(now) {
+        framePulse(now);
 
         for (var c = 0; c < 3; c++) {
           for (var ch = 0; ch < 3; ch++) current[c][ch] += (wanted[c][ch] - current[c][ch]) * 0.07;
@@ -678,11 +715,538 @@ export function getVisualizerScript(): string {
         glowActive = false;
       }
 
+
+      // ---- Oscilloscope: the waveform itself, a glowing line on the bar edge ----
+      var scopeBuf = null;
+      var scopePeak = 0.05;
+      var scopeY = null;
+      // The shared analysers hold 5-10 ms of audio, less than one bass cycle,
+      // so no trigger can hold the wave still. Branch a long-window analyser
+      // off whichever one carries the signal (an analyser passes audio through
+      // unchanged; the branch ends in a muted gain, so nothing is doubled).
+      var scopeTaps = typeof WeakMap === 'function' ? new WeakMap() : null;
+      function scopeAnalyserFor(base) {
+        if (!base || !base.context || !scopeTaps) return base;
+        var tap = scopeTaps.get(base);
+        if (tap) return tap;
+        try {
+          var actx = base.context;
+          tap = actx.createAnalyser();
+          tap.fftSize = 2048;
+          tap.smoothingTimeConstant = 0;
+          base.connect(tap);
+          var mute = actx.createGain();
+          mute.gain.value = 0;
+          tap.connect(mute);
+          mute.connect(actx.destination);
+          scopeTaps.set(base, tap);
+          return tap;
+        } catch (e) {
+          return base;
+        }
+      }
+      function drawScope(now) {
+        if (!ensureCanvas()) return;
+        var bar = playerBar();
+        if (!bar) { canvas.style.opacity = '0'; return; }
+        var barRect = bar.getBoundingClientRect();
+        var W = Math.min(window.innerWidth, document.documentElement.clientWidth || window.innerWidth);
+        var H = 30;
+        var dpr = Math.min(2, window.devicePixelRatio || 1);
+        if (canvas.width !== W * dpr || canvas.height !== H * dpr) {
+          canvas.width = W * dpr;
+          canvas.height = H * dpr;
+          canvas.style.width = W + 'px';
+          canvas.style.height = H + 'px';
+        }
+        // Centred on the top edge of the player bar.
+        canvas.style.top = (barRect.top - H / 2) + 'px';
+        canvas.style.left = '0';
+        canvas.style.transform = '';
+        var ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        easePalette();
+
+        var analyser = scopeAnalyserFor(activeAnalyser || window.__scAudioAnalyser || window.__scVizAnalyser);
+        var n = 0;
+        if (analyser && typeof analyser.getFloatTimeDomainData === 'function') {
+          if (!scopeBuf || scopeBuf.length !== analyser.fftSize) scopeBuf = new Float32Array(analyser.fftSize);
+          analyser.getFloatTimeDomainData(scopeBuf);
+          n = scopeBuf.length;
+        }
+        var maxAbs = 0;
+        for (var i = 0; i < n; i++) { var a = Math.abs(scopeBuf[i]); if (a > maxAbs) maxAbs = a; }
+        // Auto gain, eased both ways: quiet and loud masters fill the strip
+        // without the line pumping on every peak. The analyser sits after
+        // SoundCloud's volume, so levels can be tiny.
+        var goal = Math.max(0.003, maxAbs);
+        scopePeak += (goal - scopePeak) * (goal > scopePeak ? 0.12 : 0.02);
+        var amp = (H / 2 - 3) * 0.9 / Math.max(0.003, scopePeak);
+        var live = maxAbs > 0.0015;
+        var cy = H / 2;
+
+        // Trigger like a real scope: start every frame at the first rising zero
+        // crossing, so the wave stands still instead of jumping phase. Cross on
+        // a smoothed copy (~2 ms average, i.e. the bass line): hi-hats and
+        // synths cross zero all the time and would pull the trigger around.
+        var span = Math.max(16, Math.floor(n / 2));
+        var start = 0;
+        if (live) {
+          var TRIG_W = Math.min(96, Math.floor(n / 8));
+          var accT = 0, prevAvg = 0;
+          for (var z = 0; z < n - span; z++) {
+            accT += scopeBuf[z];
+            if (z >= TRIG_W) accT -= scopeBuf[z - TRIG_W];
+            var avg = accT / Math.min(z + 1, TRIG_W);
+            if (z > TRIG_W && prevAvg < 0 && avg >= 0) { start = z - (TRIG_W >> 1); break; }
+            prevAvg = avg;
+          }
+        }
+        var points = Math.max(32, Math.min(span, Math.floor(W / 4)));
+        if (!scopeY || scopeY.length !== points) {
+          scopeY = new Float32Array(points);
+          for (var q = 0; q < points; q++) scopeY[q] = cy;
+        }
+        for (var pi = 0; pi < points; pi++) {
+          var ty;
+          if (live) {
+            // Average a few neighbouring samples: smoother line, no aliasing.
+            var f = start + (pi / (points - 1)) * (span - 1);
+            var i0 = Math.max(0, Math.floor(f) - 1), i1 = Math.min(n - 1, i0 + 2);
+            var acc = 0;
+            for (var si = i0; si <= i1; si++) acc += scopeBuf[si];
+            ty = cy - (acc / (i1 - i0 + 1)) * amp;
+          } else {
+            ty = cy + Math.sin(pi / (points - 1) * 18 + now / 600) * 1.2;
+          }
+          ty = clamp(ty, 2, H - 2);
+          // Ease towards the new frame: no flicker between frames.
+          scopeY[pi] += (ty - scopeY[pi]) * 0.45;
+        }
+
+        ctx.clearRect(0, 0, W, H);
+        var grad = ctx.createLinearGradient(0, 0, W, 0);
+        // Lifted towards white: a dark cover palette must still read as a line.
+        var c0 = mix(current[0], [255, 255, 255], 0.3), c1 = mix(current[1], [255, 255, 255], 0.3), c2 = mix(current[2], [255, 255, 255], 0.3);
+        grad.addColorStop(0, rgbCss(c0, 0));
+        grad.addColorStop(0.08, rgbCss(c0, 1));
+        grad.addColorStop(0.5, rgbCss(c1, 1));
+        grad.addColorStop(0.92, rgbCss(c2, 1));
+        grad.addColorStop(1, rgbCss(c2, 0));
+
+        // Curves through segment midpoints: a smooth trace, no sharp corners.
+        ctx.beginPath();
+        var step = W / (points - 1);
+        ctx.moveTo(0, scopeY[0]);
+        for (var p = 1; p < points - 1; p++) {
+          ctx.quadraticCurveTo(p * step, scopeY[p], (p + 0.5) * step, (scopeY[p] + scopeY[p + 1]) / 2);
+        }
+        ctx.lineTo(W, scopeY[points - 1]);
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = grad;
+        ctx.globalAlpha = 0.25;
+        ctx.lineWidth = 7;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        canvas.style.opacity = '1';
+      }
+
+      // ---- Window edge glow: cover colours around the window, pulsing ----
+      // Only opacity changes per frame (compositor work); the inset shadows are
+      // rewritten when the palette colour actually moves.
+      var ambientRoot = null;
+      var ambientBase = null;
+      var ambientKick = null;
+      var ambientColorKey = '';
+      var ambientColorAt = 0;
+      var ambientLevel = 0;
+      var ambientFlare = 0;
+      var ambientLast = 0;
+      function ensureAmbient() {
+        if (ambientRoot && ambientRoot.isConnected) return ambientRoot;
+        ambientRoot = document.createElement('div');
+        ambientRoot.id = 'sc-visualizer-ambient';
+        ambientRoot.setAttribute('aria-hidden', 'true');
+        ambientRoot.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:99996;opacity:0;transition:opacity .45s ease;';
+        ambientBase = document.createElement('div');
+        ambientKick = document.createElement('div');
+        [ambientBase, ambientKick].forEach(function(el) {
+          el.style.cssText = 'position:absolute;inset:0;opacity:0;will-change:opacity;';
+          ambientRoot.appendChild(el);
+        });
+        (document.body || document.documentElement).appendChild(ambientRoot);
+        return ambientRoot;
+      }
+      function drawAmbient(now) {
+        var root = ensureAmbient();
+        easePalette();
+        var bass = framePulse(now);
+        // Overall loudness from the spectrum, slowly smoothed.
+        var analyser = activeAnalyser || window.__scAudioAnalyser || window.__scVizAnalyser;
+        var level = 0;
+        if (analyser && freq && freq.length) {
+          var sum = 0, m = Math.max(8, Math.floor(freq.length * 0.46));
+          for (var i = 0; i < m; i++) sum += freq[i];
+          level = sum / (m * 255);
+        }
+        // Time-based easing: the same feel at 30, 60 or 144 fps.
+        var adt = ambientLast ? Math.min(100, now - ambientLast) : 16;
+        ambientLast = now;
+        ambientLevel += (level - ambientLevel) * (1 - Math.exp(-adt / 300));
+
+        if (now - ambientColorAt > 250) {
+          ambientColorAt = now;
+          var key = current.map(function(c) { return [c[0] >> 3, c[1] >> 3, c[2] >> 3].join(','); }).join('|');
+          if (key !== ambientColorKey) {
+            ambientColorKey = key;
+            // A thin rim, not a frame: it should sit at the edge of vision.
+            ambientBase.style.boxShadow = 'inset 0 0 80px 8px ' + rgbCss(current[0], 0.6) + ', inset 0 0 18px 1px ' + rgbCss(current[1], 0.35);
+            ambientKick.style.boxShadow = 'inset 0 0 130px 18px ' + rgbCss(current[1], 0.6) + ', inset 0 0 40px 4px ' + rgbCss(current[2], 0.45);
+          }
+        }
+        // Faint while the music is quiet; only clear hits flare, and the
+        // flare rises fast but fades slowly so it never strobes.
+        ambientBase.style.opacity = String(clamp(0.25 + ambientLevel * 0.5, 0.25, 0.55).toFixed(3));
+        // Only the transient part of the kick detector: the overall bass level
+        // stays high through a dense track and kept the flare lit.
+        var hit = clamp((kickLevel - 0.22) / 0.78, 0, 1);
+        ambientFlare += (hit - ambientFlare) * (1 - Math.exp(-adt / (hit > ambientFlare ? 40 : 280)));
+        ambientKick.style.opacity = String((ambientFlare * 0.75).toFixed(3));
+        root.style.opacity = '1';
+      }
+      function hideAmbient() {
+        if (ambientRoot) ambientRoot.style.opacity = '0';
+      }
+
+      // ---- Retro LED meter: segmented columns with falling peak caps ----
+      var ledPeaks = null;
+      var ledLast = 0;
+      function drawLed(now) {
+        if (!ensureCanvas()) return;
+        var bar = playerBar();
+        if (!bar) { canvas.style.opacity = '0'; return; }
+        var barRect = bar.getBoundingClientRect();
+        var W = Math.min(window.innerWidth, document.documentElement.clientWidth || window.innerWidth);
+        var fit = gutterFit(W);
+        var narrow = !fit.inBar;
+        var H = narrow ? 32 : barRect.height;
+        var dpr = Math.min(2, window.devicePixelRatio || 1);
+        if (canvas.width !== W * dpr || canvas.height !== H * dpr) {
+          canvas.width = W * dpr;
+          canvas.height = H * dpr;
+          canvas.style.width = W + 'px';
+          canvas.style.height = H + 'px';
+        }
+        canvas.style.top = (narrow ? Math.max(0, barRect.top - H - 4) : barRect.top) + 'px';
+        canvas.style.left = '0';
+        canvas.style.transform = '';
+        var ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        var nb = 10;
+        cols = nb;
+        if (!smooth || smooth.length !== cols) smooth = new Float32Array(cols);
+        if (!ledPeaks || ledPeaks.length !== cols) ledPeaks = new Float32Array(cols);
+        spectrumTargets(now);
+        smoothLevels();
+        easePalette();
+
+        var dt = ledLast ? Math.min(100, now - ledLast) : 16;
+        ledLast = now;
+        var S = narrow ? 6 : 8;
+        var top = narrow ? 3 : Math.max(5, H * 0.14);
+        var bottom = narrow ? H - 1 : H - Math.max(5, H * 0.14);
+        var gapY = 1.5;
+        var segH = Math.max(1.5, (bottom - top - (S - 1) * gapY) / S);
+        var margin = fit.margin;
+        var groupW = fit.inBar ? fit.groupW : clamp(W * 0.2, 70, 210);
+        var unit = groupW / nb;
+        var bw = Math.max(2, Math.min(10, unit * 0.68));
+        var gap = Math.max(1, unit - bw);
+
+        ctx.clearRect(0, 0, W, H);
+        for (var j = 0; j < nb; j++) {
+          var lit = smooth[j] * S;
+          // Peaks hold, then fall about one segment per 90 ms.
+          ledPeaks[j] = Math.max(lit, ledPeaks[j] - dt / 90);
+          var peakSeg = Math.min(S - 1, Math.floor(ledPeaks[j]));
+          for (var k = 0; k < S; k++) {
+            var y = bottom - (k + 1) * segH - k * gapY;
+            var litSeg = k < Math.round(lit);
+            var t = S > 1 ? k / (S - 1) : 0;
+            if (litSeg) {
+              var col = mix(current[0], current[2], t);
+              if (k >= S - 2) col = mix(col, [255, 255, 255], 0.2);
+              ctx.fillStyle = rgbCss(col, 0.95);
+            } else if (k === peakSeg && ledPeaks[j] > 0.6) {
+              ctx.fillStyle = rgbCss(current[2], 0.85);
+            } else {
+              ctx.fillStyle = 'rgba(255,255,255,0.07)';
+            }
+            var xl = margin + j * (bw + gap);
+            var xr = W - margin - bw - j * (bw + gap);
+            ctx.fillRect(xl, y, bw, segH);
+            ctx.fillRect(xr, y, bw, segH);
+          }
+        }
+        canvas.style.opacity = '1';
+      }
+
+      // ---- Spectrogram: a waterfall painted behind the player controls ----
+      var specCanvas = null;
+      var specBuffer = null;
+      var specLast = 0;
+      var specRows = 0;
+      var specAvg = null;
+      var specOnsetMax = null;
+      var specPeak = 0.3;
+      var specCarry = 0;
+      function ensureSpecCanvas(bar) {
+        var host = bar.querySelector('.playControls__inner') || bar;
+        if (specCanvas && specCanvas.parentElement === host) return specCanvas;
+        if (specCanvas && specCanvas.parentElement) specCanvas.parentElement.removeChild(specCanvas);
+        specCanvas = document.createElement('canvas');
+        specCanvas.id = 'sc-visualizer-spectrogram';
+        specCanvas.setAttribute('aria-hidden', 'true');
+        // First child, positioned: SoundCloud's controls (positioned, later in
+        // the tree) paint on top, the bar background stays underneath.
+        specCanvas.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:0;opacity:0;transition:opacity .45s ease;' +
+          '-webkit-mask-image:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent);mask-image:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent);';
+        host.insertBefore(specCanvas, host.firstChild);
+        return specCanvas;
+      }
+      function drawSpectrogram(now) {
+        var bar = playerBar();
+        if (!bar) return;
+        var cv = ensureSpecCanvas(bar);
+        var r = bar.getBoundingClientRect();
+        var dpr = Math.min(2, window.devicePixelRatio || 1);
+        var W = Math.max(64, Math.round(r.width));
+        var H = Math.max(16, Math.round(r.height));
+        if (cv.width !== W * dpr || cv.height !== H * dpr) {
+          cv.width = W * dpr;
+          cv.height = H * dpr;
+          specLast = 0;
+        }
+        // Explicit size: the bar's inner box carries a transform, so a
+        // percentage would resolve against the wrong box.
+        if (cv.style.width !== W + 'px') cv.style.width = W + 'px';
+        if (cv.style.height !== H + 'px') cv.style.height = H + 'px';
+        var ctx = cv.getContext('2d');
+        if (!ctx) return;
+        easePalette();
+
+        var analyser = activeAnalyser || window.__scAudioAnalyser || window.__scVizAnalyser;
+        if (!analyser) { cv.style.opacity = '0.8'; return; }
+        if (!freq || freq.length !== analyser.frequencyBinCount) freq = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(freq);
+
+        // Scroll left at ~90 px/s, whatever the frame rate.
+        var dt = specLast ? Math.min(100, now - specLast) : 16;
+        specLast = now;
+        specCarry += dt * 0.09 * dpr;
+        var dx = Math.floor(specCarry);
+        if (dx < 1) { cv.style.opacity = '0.8'; return; }
+        specCarry -= dx;
+
+        // Scroll through a second canvas: drawing a canvas onto itself in
+        // 'copy' mode clears it first, which kept only the newest column.
+        var cw = cv.width, ch = cv.height;
+        if (!specBuffer) specBuffer = document.createElement('canvas');
+        if (specBuffer.width !== cw || specBuffer.height !== ch) { specBuffer.width = cw; specBuffer.height = ch; }
+        var bctx = specBuffer.getContext('2d');
+        if (!bctx) return;
+        bctx.globalCompositeOperation = 'copy';
+        bctx.drawImage(cv, -dx, 0);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalCompositeOperation = 'copy';
+        ctx.drawImage(specBuffer, 0, 0);
+        ctx.globalCompositeOperation = 'source-over';
+
+        // SoundCloud's analyser is heavily smoothed, so raw levels sit near
+        // the top and the band looked like one flat stripe. Paint what
+        // changes instead: each row's rise over its own recent average,
+        // scaled to that row's recent biggest rise, over a faint level base.
+        // Measured on live audio: ~12% bright cells instead of ~90%, and
+        // about 3x more movement over time.
+        var rows = Math.max(8, Math.floor(H / 2));
+        var rowH = ch / rows;
+        var bins = freq.length;
+        var usable = Math.max(8, Math.floor(bins * 0.46));
+        if (specRows !== rows) {
+          specRows = rows;
+          specAvg = new Float32Array(rows);
+          specOnsetMax = new Float32Array(rows);
+          for (var r0 = 0; r0 < rows; r0++) specOnsetMax[r0] = 0.05;
+        }
+        var avgRate = 1 - Math.exp(-dt / 1200);
+        var maxDecay = Math.exp(-dt / 2500);
+        var fmax = 0;
+        for (var i = 0; i < rows; i++) {
+          var tt = rows > 1 ? i / (rows - 1) : 0;
+          var bb = Math.min(bins - 1, Math.floor(Math.pow(tt, 1.55) * usable));
+          if (freq[bb] / 255 > fmax) fmax = freq[bb] / 255;
+        }
+        specPeak = Math.max(fmax, specPeak * Math.exp(-dt / 4000), 0.15);
+        for (var ri = 0; ri < rows; ri++) {
+          // Bottom row = bass.
+          var t = rows > 1 ? ri / (rows - 1) : 0;
+          var bin = Math.min(bins - 1, Math.floor(Math.pow(t, 1.55) * usable));
+          var level = (freq[bin] + freq[Math.min(bins - 1, bin + 1)]) / 510;
+          specAvg[ri] += (level - specAvg[ri]) * avgRate;
+          var rise = Math.max(0, level - specAvg[ri]);
+          specOnsetMax[ri] = Math.max(rise, specOnsetMax[ri] * maxDecay, 0.02);
+          var v = clamp(0.3 * Math.pow(level / specPeak, 4) + 1.15 * Math.pow(rise / specOnsetMax[ri], 1.5), 0, 1);
+          if (v < 0.08) continue;
+          var lo = mix(current[0], [255, 255, 255], 0.1);
+          var col = v < 0.5 ? mix(lo, current[1], v * 2) : mix(current[1], mix(current[2], [255, 255, 255], 0.5), (v - 0.5) * 2);
+          ctx.fillStyle = rgbCss(col, clamp(0.12 + v * 0.85, 0, 0.97));
+          ctx.fillRect(cw - dx, ch - (ri + 1) * rowH, dx, Math.ceil(rowH));
+        }
+        cv.style.opacity = '0.8';
+      }
+
+      // ---- Full-screen lyrics: cover with a circular spectrum, pulsing backdrop ----
+      var lyricsRing = true;
+      var ringSmooth = null;
+      var ringParts = null;
+      var ringArt = '';
+      var ringPulseKey = '';
+      var RING_BARS = 64;
+      function lyricsFs() {
+        var fs = document.getElementById('sc-lyrics-fs');
+        return fs && fs.classList.contains('open') ? fs : null;
+      }
+      function ensureRingParts(fs) {
+        if (ringParts && ringParts.fs === fs && ringParts.wrap.isConnected) return ringParts;
+        if (!document.getElementById('sc-fs-ring-style')) {
+          var st = document.createElement('style');
+          st.id = 'sc-fs-ring-style';
+          st.textContent =
+            '#sc-lyrics-fs .sc-fs-pulse{position:absolute;inset:0;opacity:0;pointer-events:none;will-change:opacity}' +
+            '#sc-lyrics-fs .sc-fs-ringwrap{position:absolute;left:5vw;top:50%;width:min(30vw,48vh);aspect-ratio:1;transform:translateY(-50%);display:none;z-index:1;pointer-events:none}' +
+            '#sc-lyrics-fs .sc-fs-ring{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity .45s ease}' +
+            '#sc-lyrics-fs .sc-fs-cover{position:absolute;inset:21%;border-radius:50%;background:#222 center/cover no-repeat;box-shadow:0 18px 50px rgba(0,0,0,.55)}' +
+            '#sc-lyrics-fs.sc-fs-ring-on .sc-fs-ringwrap{display:block}' +
+            '#sc-lyrics-fs.sc-fs-ring-on .sc-fs-body{padding-left:calc(9vw + min(30vw,48vh));padding-right:5vw}';
+          (document.head || document.documentElement).appendChild(st);
+        }
+        var pulse = document.createElement('div');
+        pulse.className = 'sc-fs-pulse';
+        var shade = fs.querySelector('.sc-fs-shade');
+        if (shade && shade.nextSibling) fs.insertBefore(pulse, shade.nextSibling); else fs.appendChild(pulse);
+        var wrap = document.createElement('div');
+        wrap.className = 'sc-fs-ringwrap';
+        wrap.innerHTML = '<canvas class="sc-fs-ring"></canvas><div class="sc-fs-cover"></div>';
+        fs.appendChild(wrap);
+        ringParts = { fs: fs, pulse: pulse, wrap: wrap, canvas: wrap.querySelector('canvas'), cover: wrap.querySelector('.sc-fs-cover') };
+        ringArt = '';
+        ringPulseKey = '';
+        return ringParts;
+      }
+      // Layout class: the cover column appears only with room for it, and only
+      // while the ring is allowed at all (visualizer on, setting on).
+      function syncRingLayout() {
+        var fs = document.getElementById('sc-lyrics-fs');
+        if (!fs) return;
+        var want = lyricsRing && on() && fs.clientWidth >= 900;
+        fs.classList.toggle('sc-fs-ring-on', !!want);
+        if (!want && ringParts && ringParts.fs === fs) ringParts.pulse.style.opacity = '0';
+      }
+      function hideRing() {
+        if (ringParts) {
+          ringParts.canvas.style.opacity = '0';
+          ringParts.pulse.style.opacity = '0';
+        }
+      }
+      function drawLyricsRing(now) {
+        var fs = lyricsFs();
+        if (!fs) return;
+        var parts = ensureRingParts(fs);
+        syncRingLayout();
+        easePalette();
+        var bass = framePulse(now);
+
+        var key = rgbCss(current[0], 1);
+        if (key !== ringPulseKey) {
+          ringPulseKey = key;
+          parts.pulse.style.background = 'radial-gradient(circle at 22% 50%,' + rgbCss(current[0], 0.5) + ',' + rgbCss(current[1], 0.12) + ' 45%,transparent 70%)';
+        }
+        parts.pulse.style.opacity = String(clamp(0.15 + bass * 0.75, 0, 0.9).toFixed(3));
+
+        if (!fs.classList.contains('sc-fs-ring-on')) return;
+
+        var art = findArtwork() || '';
+        if (art && art !== ringArt) {
+          ringArt = art;
+          parts.cover.style.backgroundImage = 'url("' + art.replace(/"/g, '%22') + '")';
+        }
+
+        var cv = parts.canvas;
+        var size = Math.round(parts.wrap.clientWidth);
+        if (size < 40) return;
+        var dpr = Math.min(2, window.devicePixelRatio || 1);
+        if (cv.width !== size * dpr) { cv.width = size * dpr; cv.height = size * dpr; }
+        var ctx = cv.getContext('2d');
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, size, size);
+
+        // Half the ring from the spectrum, mirrored, so bass meets at the top.
+        var half = RING_BARS / 2;
+        if (!ringSmooth || ringSmooth.length !== half) ringSmooth = new Float32Array(half);
+        var bins = freq ? freq.length : 0;
+        var usable = Math.max(8, Math.floor(bins * 0.46));
+        for (var i = 0; i < half; i++) {
+          var t = half > 1 ? i / (half - 1) : 0;
+          var v = 0;
+          if (bins) v = Math.pow(freq[Math.min(bins - 1, Math.floor(Math.pow(t, 1.55) * usable))] / 255, 1.25);
+          var idle = 0.04 * (0.6 + 0.4 * Math.sin(now / 700 + i * 0.5));
+          if (v < idle) v = idle;
+          ringSmooth[i] += (v - ringSmooth[i]) * (v > ringSmooth[i] ? 0.55 : 0.14);
+        }
+
+        var c = size / 2;
+        var inner = size * 0.29 * (1 + bass * 0.025);
+        var reach = size * 0.19;
+        var barW = Math.max(2, (2 * Math.PI * inner / RING_BARS) * 0.55);
+        var spin = now / 24000;
+        ctx.lineCap = 'round';
+        ctx.lineWidth = barW;
+        for (var b = 0; b < RING_BARS; b++) {
+          var m = b < half ? b : RING_BARS - 1 - b;
+          var lv = ringSmooth[m];
+          var ang = -Math.PI / 2 + (b + 0.5) / RING_BARS * Math.PI * 2 + spin;
+          var len = 3 + lv * reach;
+          var cs = Math.cos(ang), sn = Math.sin(ang);
+          ctx.strokeStyle = rgbCss(mix(current[0], current[2], m / Math.max(1, half - 1)), 0.55 + lv * 0.45);
+          ctx.beginPath();
+          ctx.moveTo(c + cs * inner, c + sn * inner);
+          ctx.lineTo(c + cs * (inner + len), c + sn * (inner + len));
+          ctx.stroke();
+        }
+        cv.style.opacity = '1';
+      }
+
+      window.__scVizSetLyricsRing = function(value) {
+        lyricsRing = value !== false;
+        syncRingLayout();
+        if (!lyricsRing) hideRing();
+      };
+
       // Fade the overlay out without destroying it: the next play resumes the
       // same canvas without a reflow flash.
       function hideVisuals() {
         if (canvas) canvas.style.opacity = '0';
         if (waveCanvas) waveCanvas.style.opacity = '0';
+        if (specCanvas) specCanvas.style.opacity = '0';
+        hideAmbient();
+        hideRing();
         // Wave is gone (pause, disable, mode switch): give the timeline its own
         // orange bar and draggable handle back.
         restoreWaveNative();
@@ -699,11 +1263,21 @@ export function getVisualizerScript(): string {
       // The draw loop is demand-driven: it runs only while audio is playing and
       // the visualizer is enabled. A permanent rAF loop kept the compositor
       // awake for the whole session even in silence.
+      // Battery saver (main process, on battery power) pauses the visualizer
+      // without touching the user's own on/off setting.
+      var powerSaver = window.__scPowerSaverActive === true;
+      function on() { return enabled && !powerSaver; }
+      window.__scVizSetPowerSaver = function(value) {
+        powerSaver = value === true;
+        applyEnabled();
+        applyPlaybackVisibility();
+      };
+
       function stopLoop() {
         if (raf) { cancelAnimationFrame(raf); raf = null; }
       }
       function startLoop() {
-        if (raf || document.hidden || !enabled) return;
+        if (raf || document.hidden || !on()) return;
         if (barRetry) { clearTimeout(barRetry); barRetry = null; }
         lastPoll = 0;
         raf = requestAnimationFrame(draw);
@@ -712,7 +1286,7 @@ export function getVisualizerScript(): string {
         if (barRetry) return;
         barRetry = setTimeout(function() {
           barRetry = null;
-          if (enabled && isPlaying() && !document.hidden) startLoop();
+          if (on() && isPlaying() && !document.hidden) startLoop();
         }, 2000);
       }
 
@@ -720,7 +1294,7 @@ export function getVisualizerScript(): string {
       // while the window is occluded, and the fade should start on the pause
       // itself, not on the next visible frame.
       function applyPlaybackVisibility() {
-        if (!enabled) {
+        if (!on()) {
           if (!visualsHidden) { hideVisuals(); visualsHidden = true; }
           stopLoop();
           return;
@@ -788,10 +1362,12 @@ export function getVisualizerScript(): string {
         if (open) {
           if (canvas) { canvas.style.transition = 'none'; canvas.style.opacity = '0'; }
           if (glowLayer) { glowLayer.style.transition = 'none'; glowLayer.style.opacity = '0'; }
+          if (ambientRoot) { ambientRoot.style.transition = 'none'; ambientRoot.style.opacity = '0'; }
           if (glowActive) clearGlow(false);
         } else {
           if (canvas) canvas.style.transition = 'opacity .45s ease';
           if (glowLayer) glowLayer.style.transition = 'opacity .45s ease';
+          if (ambientRoot) ambientRoot.style.transition = 'opacity .45s ease';
         }
       }
       var modalObsTimer = null;
@@ -813,9 +1389,9 @@ export function getVisualizerScript(): string {
 
         // Leaving wave mode (or switching the visualizer off) must hand the
         // timeline back to SoundCloud's own colours.
-        if (vizType !== 'wave' || !enabled) restoreWaveNative();
+        if (vizType !== 'wave' || !on()) restoreWaveNative();
 
-        if (!enabled) {
+        if (!on()) {
           if (!visualsHidden) { hideVisuals(); visualsHidden = true; }
           stopLoop();
           return;
@@ -861,14 +1437,21 @@ export function getVisualizerScript(): string {
         else if (vizType === 'above') drawAbove(now);
         else if (vizType === 'wave') drawWave(now);
         else if (vizType === 'glow') drawGlow(now);
+        else if (vizType === 'scope') drawScope(now);
+        else if (vizType === 'ambient') drawAmbient(now);
+        else if (vizType === 'led') drawLed(now);
+        else if (vizType === 'spectrogram') drawSpectrogram(now);
+
+        if (lyricsRing) drawLyricsRing(now);
 
         raf = requestAnimationFrame(draw);
       }
 
       function applyEnabled() {
+        syncRingLayout();
         if (!canvas) return;
-        canvas.style.opacity = enabled ? '1' : '0';
-        if (enabled) startLoop();
+        canvas.style.opacity = on() ? '1' : '0';
+        if (on()) startLoop();
         else stopLoop();
       }
 
@@ -900,6 +1483,7 @@ export function getVisualizerScript(): string {
         api.storeGet('visualizer').then(function(state) {
           enabled = !state || state.enabled !== false;
           if (state && state.type) vizType = state.type;
+          lyricsRing = !state || state.lyricsRing !== false;
           applyEnabled();
         }).catch(function() {});
       }
@@ -912,7 +1496,7 @@ export function getVisualizerScript(): string {
       // (autoplay, media keys, auto-advance): one cheap probe per second, and
       // the draw loop itself is left stopped while paused.
       setInterval(function() {
-        if (!raf && enabled && !document.hidden && isPlaying()) startLoop();
+        if (!raf && on() && !document.hidden && isPlaying()) startLoop();
       }, 1000);
       document.addEventListener('visibilitychange', function() {
         if (document.hidden) stopLoop();

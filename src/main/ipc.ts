@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { execFile } from 'child_process';
-import { IPC_CHANNELS, STORE_DEFAULTS, SOUNDCLOUD_API_V2, CHROME_UA, emptyHistoryStats } from '../shared/constants';
+import { IPC_CHANNELS, STORE_DEFAULTS, SOUNDCLOUD_API_V2, CHROME_UA, emptyHistoryStats, VISUALIZER_TYPES } from '../shared/constants';
 import { logInfo, logWarn } from './logger';
 import archiver from 'archiver';
 import { StoreSchema, DownloadRequest } from '../shared/types';
@@ -51,7 +51,7 @@ const STORE_KEYS = new Set([
   'adblocker', 'adblocker.enabled', 'adblocker.blockedCount', 'adblocker.customRules', 'adblocker.whitelist',
   'adblocker.remoteDomains', 'adblocker.lastUpdated', 'downloader', 'downloader.outputDir', 'downloader.quality',
   'downloader.history', 'settings', 'settings.startMinimized', 'settings.launchOnStartup', 'settings.accentColor',
-  'settings.dynamicAccent', 'player', 'player.skipPromoted', 'player.skipPreviews', 'player.notifications', 'player.scrobble', 'player.speed', 'searchHistory', 'wave',
+  'settings.dynamicAccent', 'settings.batterySaver', 'player', 'player.skipPromoted', 'player.skipPreviews', 'player.notifications', 'player.scrobble', 'player.resume', 'player.speed', 'searchHistory', 'wave',
   'settings.autoUpdate', 'settings.keybinds', 'history', 'history.enabled', 'history.maxTracks', 'history.tracks', 'history.stats', 'lyrics',
   'lyrics.fontSize', 'themes', 'themes.active', 'themes.custom', 'customCss', 'customCss.code', 'equalizer', 'visualizer',
   'sidebar',
@@ -80,8 +80,8 @@ function validateStoreValue(key: string, value: unknown): void {
   if (key === 'settings.accentColor' && (typeof value !== 'string' || !/^#[0-9a-f]{3,8}$/i.test(value))) {
     throw new Error('Invalid accent color');
   }
-  if ((key === 'settings.dynamicAccent' || key === 'player.skipPromoted' || key === 'player.skipPreviews' ||
-       key === 'player.notifications' || key === 'player.scrobble') && typeof value !== 'boolean') {
+  if ((key === 'settings.dynamicAccent' || key === 'settings.batterySaver' || key === 'player.skipPromoted' || key === 'player.skipPreviews' ||
+       key === 'player.notifications' || key === 'player.scrobble' || key === 'player.resume') && typeof value !== 'boolean') {
     throw new Error('Invalid flag');
   }
   if (key === 'player.speed' && (typeof value !== 'number' || !Number.isFinite(value) || value < 0.25 || value > 3)) {
@@ -124,7 +124,8 @@ function validateStoreValue(key: string, value: unknown): void {
   if (key === 'visualizer') {
     const state = value as any;
     if (!state || typeof state !== 'object' || Array.isArray(state) || typeof state.enabled !== 'boolean' ||
-        !['side', 'above', 'wave', 'glow'].includes(state.type)) {
+        !(VISUALIZER_TYPES as readonly string[]).includes(state.type) ||
+        (state.lyricsRing !== undefined && typeof state.lyricsRing !== 'boolean')) {
       throw new Error('Invalid visualizer state');
     }
   }

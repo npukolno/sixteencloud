@@ -296,6 +296,70 @@ body {
 
 #sc-overlay-rail::-webkit-scrollbar { width: 0; height: 0; }
 
+/* Room for the rail. --sc-page-shift is computed by layoutRail() in main.ts:
+   0 on wide windows, just enough to clear the rail on mid-size ones. The
+   fixed header and player bar have left:auto, so they would inherit the
+   #app padding as their static position: pin them to the edge and give them
+   the same padding so their centred containers line up with the page. */
+html.sc-page-shifted #app > header.header,
+html.sc-page-shifted #app > .playControls {
+  left: 0 !important;
+}
+
+/* The player bar paints its background on __inner, so pad that, not the bar. */
+html.sc-page-shifted #app,
+html.sc-page-shifted #app > header.header,
+html.sc-page-shifted #app > .playControls .playControls__inner {
+  padding-left: var(--sc-page-shift, 0px) !important;
+  box-sizing: border-box !important;
+}
+
+/* Too narrow for a rail column: hide the rail behind a handle at the edge. */
+#sc-rail-handle {
+  display: none;
+}
+
+html.sc-rail-compact #sc-rail-handle {
+  display: block;
+  position: fixed;
+  left: 0;
+  top: 50%;
+  width: 14px;
+  height: 140px;
+  transform: translateY(-50%);
+  z-index: 100000;
+  cursor: pointer;
+}
+
+html.sc-rail-compact #sc-rail-handle::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  width: 4px;
+  height: 56px;
+  margin-top: -28px;
+  border-radius: 4px;
+  background: var(--sc-border-strong);
+  transition: background 160ms ease, height 160ms ease, margin-top 160ms ease;
+}
+
+html.sc-rail-compact #sc-rail-handle:hover::before {
+  height: 72px;
+  margin-top: -36px;
+  background: var(--sc-accent);
+}
+
+html.sc-rail-compact #sc-overlay-rail {
+  transition: width 280ms cubic-bezier(.2, .9, .25, 1), box-shadow 200ms ease, transform 240ms cubic-bezier(.2, .9, .25, 1);
+}
+
+/* The hub keeps its navigation visible while it is open. */
+html.sc-rail-compact body:not(.sc-overlay-open) > #sc-overlay-rail:not(:hover):not(:focus-within):not(.sc-rail-peek) {
+  transform: translate(calc(-100% - 40px), -50%) translateZ(0);
+  box-shadow: none;
+}
+
 #sc-overlay-rail:hover,
 #sc-overlay-rail:focus-within {
   width: var(--sc-rail-w-open);
@@ -1748,6 +1812,34 @@ body {
   .sc-overlay-body {
     padding: 20px;
   }
+}
+
+/* ===== Battery saver (on battery power, see setupBatterySaver in main.ts) =====
+   Live blur behind translucent panels and our animations keep the GPU busy;
+   drop them and make the panels opaque enough to stay readable. */
+html.sc-power-saver *,
+html.sc-power-saver *::before,
+html.sc-power-saver *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.sc-power-saver #sc-overlay-rail {
+  background: rgba(24, 25, 29, 0.97) !important;
+}
+
+html.sc-power-saver #sc-overlay-container,
+html.sc-power-saver .sc-overlay-window,
+html.sc-power-saver .sc-overlay-panel.active,
+html.sc-power-saver .sc-nav-item,
+html.sc-power-saver .sc-overlay-btn,
+html.sc-power-saver .sc-overlay-switch-slider,
+html.sc-power-saver .sc-overlay-switch-slider::before,
+html.sc-power-saver #sc-overlay-rail,
+html.sc-power-saver .sc-nav-label,
+html.sc-power-saver .sc-rail-search {
+  animation: none !important;
+  transition-duration: 0.01ms !important;
 }
 
 /* ===== Responsive rail: compress on short windows (all platforms) ===== */

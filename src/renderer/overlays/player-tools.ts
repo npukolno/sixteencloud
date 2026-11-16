@@ -23,6 +23,13 @@ export function getPlayerToolsOverlayHTML(): string {
         </div>
         <label class="sc-overlay-switch"><input type="checkbox" id="sc-pl-skip-previews"><span class="sc-overlay-switch-slider"></span></label>
       </div>
+      <div class="sc-overlay-toggle">
+        <div>
+          <span class="sc-overlay-toggle-label">${t('player.resume')}</span>
+          <div class="sc-pl-desc">${t('player.resume_desc')}</div>
+        </div>
+        <label class="sc-overlay-switch"><input type="checkbox" id="sc-pl-resume"><span class="sc-overlay-switch-slider"></span></label>
+      </div>
 
       <div class="sc-overlay-group" style="margin-top:16px">
         <span class="sc-overlay-label">${t('player.speed')}</span>
@@ -99,7 +106,7 @@ export function getPlayerToolsOverlayScript(): string {
       document.head.appendChild(style);
 
       function $(id) { return panel.querySelector(id); }
-      var skipPromoted = $('#sc-pl-skip-promoted'), skipPreviews = $('#sc-pl-skip-previews');
+      var skipPromoted = $('#sc-pl-skip-promoted'), skipPreviews = $('#sc-pl-skip-previews'), resume = $('#sc-pl-resume');
       var speed = $('#sc-pl-speed'), speedVal = $('#sc-pl-speed-val'), speedReset = $('#sc-pl-speed-reset');
       var notify = $('#sc-pl-notify'), scrobble = $('#sc-pl-scrobble'), scrobbleBox = $('#sc-pl-scrobble-box');
       var lbToken = $('#sc-pl-lb-token'), lbSave = $('#sc-pl-lb-save'), lbStatus = $('#sc-pl-lb-status');
@@ -110,6 +117,7 @@ export function getPlayerToolsOverlayScript(): string {
         var c = cfg();
         skipPromoted.checked = c.skipPromoted !== false;
         skipPreviews.checked = !!c.skipPreviews;
+        resume.checked = c.resume !== false;
         notify.checked = !!c.notifications;
         scrobble.checked = !!c.scrobble;
         scrobbleBox.style.display = scrobble.checked ? 'block' : 'none';
@@ -121,6 +129,7 @@ export function getPlayerToolsOverlayScript(): string {
 
       skipPromoted.addEventListener('change', function() { window.__scCfgSet('skipPromoted', skipPromoted.checked); });
       skipPreviews.addEventListener('change', function() { window.__scCfgSet('skipPreviews', skipPreviews.checked); });
+      resume.addEventListener('change', function() { window.__scCfgSet('resume', resume.checked); });
       notify.addEventListener('change', function() { window.__scCfgSet('notifications', notify.checked); });
       scrobble.addEventListener('change', function() {
         window.__scCfgSet('scrobble', scrobble.checked);

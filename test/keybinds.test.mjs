@@ -66,3 +66,12 @@ test('comboLabel renders stored combos for the settings panel', () => {
   assert.equal(comboLabel('Space'), 'Space');
   assert.equal(comboLabel('Meta+KeyP'), 'Meta+P');
 });
+
+test('default keybinds never collide and the rail toggle is Ctrl+G', () => {
+  for (const platform of ['linux', 'win32', 'darwin']) {
+    const combos = Object.values(defaultKeybinds(platform));
+    assert.equal(new Set(combos).size, combos.length, `duplicate default keybind on ${platform}`);
+  }
+  assert.equal(defaultKeybinds('win32').rail, 'Ctrl+KeyG');
+  assert.equal(resolveKeybinds({ rail: 'Alt+KeyH' }).rail, 'Alt+KeyH');
+});

@@ -1,3 +1,5 @@
+import type { VisualizerType } from './constants';
+
 export interface TrackInfo {
   title: string;
   artist: string;
@@ -109,6 +111,10 @@ export interface StoreSchema {
     dynamicAccent: boolean;
     autoUpdate: boolean;
     keybinds: Record<string, string>;
+    /** Side rail hidden behind its edge handle (rail keybind). */
+    railHidden?: boolean;
+    /** Drop the visualizer, blur and animations while on battery (default on). */
+    batterySaver?: boolean;
   };
   history: {
     enabled: boolean;
@@ -125,6 +131,8 @@ export interface StoreSchema {
     notifications: boolean;
     scrobble: boolean;
     speed: number;
+    /** Jump back to the remembered position after a restart (default on). */
+    resume?: boolean;
   };
   searchHistory: string[];
   wave: {
@@ -152,9 +160,11 @@ export interface StoreSchema {
   };
   visualizer: {
     enabled: boolean;
-    type: 'side' | 'above' | 'wave' | 'glow';
+    type: VisualizerType;
     colorScheme: string;
     version?: number;
+    /** Ring spectrum around the cover in full-screen lyrics (default on). */
+    lyricsRing?: boolean;
   };
   sidebar: {
     bookmarks: SidebarBookmark[];

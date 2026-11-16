@@ -1,4 +1,4 @@
-export const KEYBIND_ACTIONS = ['sidebar', 'playPause', 'volumeUp', 'volumeDown', 'miniPlayer'] as const;
+export const KEYBIND_ACTIONS = ['sidebar', 'rail', 'playPause', 'volumeUp', 'volumeDown', 'miniPlayer'] as const;
 export type KeybindAction = (typeof KEYBIND_ACTIONS)[number];
 
 export type Keybinds = Partial<Record<KeybindAction, string>>;
@@ -24,6 +24,7 @@ const MODIFIERS = new Set(['ctrl', 'control', 'alt', 'shift', 'meta', 'cmd', 'co
 
 const DEFAULT_CODES: Record<KeybindAction, string> = {
   sidebar: 'Ctrl+KeyB',
+  rail: 'Ctrl+KeyG',
   playPause: 'Space',
   volumeUp: 'Ctrl+ArrowUp',
   volumeDown: 'Ctrl+ArrowDown',

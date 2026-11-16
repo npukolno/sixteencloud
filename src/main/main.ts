@@ -1,7 +1,7 @@
-import { app, BrowserWindow, session, globalShortcut, ipcMain, shell, screen, dialog, type WebContents } from 'electron';
+import { app, BrowserWindow, session, globalShortcut, ipcMain, shell, screen, dialog, powerMonitor, type WebContents } from 'electron';
 import path from 'path';
 import fs from 'fs';
-import { spawn, execFile } from 'child_process';
+import { execFile } from 'child_process';
 import { SOUNDCLOUD_URL, WINDOW_CONFIG, IPC_CHANNELS, AD_DOMAINS, AD_CSS_SELECTORS, AD_URL_PATTERNS, CHROME_UA } from '../shared/constants';
 import { applyUserAgentHeaders, applyFirefoxHeaders, FIREFOX_UA, UA_SUMMARY } from '../shared/user-agent';
 import { setupIPC, getStore, getEncryptionKey } from './ipc';
@@ -22,6 +22,7 @@ import { getHistoryOverlayHTML, getHistoryOverlayScript } from '../renderer/over
 import { getLyricsOverlayHTML, getLyricsOverlayScript } from '../renderer/overlays/lyrics';
 import { getThemesOverlayHTML, getThemesOverlayScript } from '../renderer/overlays/themes';
 import { getCustomCssOverlayHTML, getCustomCssOverlayScript } from '../renderer/overlays/custom-css';
+import { setupWindowsTaskbar } from './windows-taskbar';
 import { getSidebarOverlayHTML, getSidebarOverlayScript } from '../renderer/overlays/sidebar';
 import { getTitlebarScript } from '../renderer/overlays/titlebar';
 import { getOfflineOverlayHTML, getOfflineOverlayScript } from '../renderer/overlays/offline';
@@ -113,6 +114,16 @@ function showAuthRejectedHint(main: BrowserWindow, authWin: BrowserWindow | null
   }).catch(() => {});
 }
 
+/**
+ * Run code in the page right away. webContents.executeJavaScript waits until
+ * the page stops loading, i.e. for every ad and tracker SoundCloud pulls in,
+ * which held the overlays back by ~2 s at startup; the main frame runs it now.
+ */
+function runInPage(win: BrowserWindow, code: string): Promise<any> {
+  const frame = win.webContents.mainFrame;
+  return frame && !frame.isDestroyed() ? frame.executeJavaScript(code) : win.webContents.executeJavaScript(code);
+}
+
 function createWindow(): BrowserWindow {
   const iconFile = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
   const win = new BrowserWindow({
@@ -190,45 +201,67 @@ function createWindow(): BrowserWindow {
     }
   });
 
-  // Show when ready (respect startMinimized)
-  const splashMinTime = Date.now() + 3000; // splash visible for at least 6.5 seconds
-  win.once('ready-to-show', () => {
-    logInfo('[SixteenCloud] ready-to-show fired');
-    const closeSplashAndShow = () => {
-      if (splashWindow && !splashWindow.isDestroyed()) {
-        splashWindow.close();
-        splashWindow = null;
-      }
-      const Store = require('electron-store');
-      try {
-        const s = new Store({ encryptionKey: getEncryptionKey() });
-        if (s.get('settings.startMinimized')) {
-          win.hide();
-          return;
-        }
-      } catch (e: any) { logWarn('Failed to check startMinimized:', e?.message); }
-      win.show();
-      win.focus();
-    };
-    const remaining = splashMinTime - Date.now();
-    if (remaining > 0) {
-      setTimeout(closeSplashAndShow, remaining);
-    } else {
-      closeSplashAndShow();
+  // The splash stays up while the app loads and is closed as soon as
+  // SoundCloud has painted and our overlays are in place, but never before its
+  // intro animation has played (respect startMinimized).
+  const SPLASH_MIN_MS = 1200; // logo, wordmark and spinner are in by ~1.1 s (splash.html)
+  const SPLASH_FADE_MS = 320; // .fade-out in splash.html runs 0.3 s
+  const splashShownAt = Date.now();
+  let painted = false;
+  let overlaysReady = false;
+  let revealed = false;
+  const closeSplashAndShow = () => {
+    if (revealed || win.isDestroyed()) return;
+    revealed = true;
+    // The splash is always on top: let it fade out over the main window
+    // instead of vanishing in one frame.
+    const splash = splashWindow;
+    splashWindow = null;
+    if (splash && !splash.isDestroyed()) {
+      splash.webContents.executeJavaScript("document.getElementById('splash').classList.add('fade-out')").catch(() => {});
+      setTimeout(() => { if (!splash.isDestroyed()) splash.close(); }, SPLASH_FADE_MS);
     }
+    const Store = require('electron-store');
+    try {
+      const s = new Store({ encryptionKey: getEncryptionKey() });
+      if (s.get('settings.startMinimized')) {
+        win.hide();
+        return;
+      }
+    } catch (e: any) { logWarn('Failed to check startMinimized:', e?.message); }
+    win.show();
+    win.focus();
+  };
+  const revealWhenReady = () => {
+    if (!painted || !overlaysReady) return;
+    setTimeout(closeSplashAndShow, Math.max(0, splashShownAt + SPLASH_MIN_MS - Date.now()));
+  };
+  win.once('ready-to-show', () => {
+    logInfo(`[SixteenCloud] ready-to-show fired after ${Date.now() - splashShownAt} ms`);
+    painted = true;
+    revealWhenReady();
+    // Error pages (offline, DNS) may never get overlays: do not wait forever.
+    setTimeout(closeSplashAndShow, 4000);
+  });
+  win.webContents.on('dom-ready', () => {
+    if (overlaysReady) return;
+    // Runs after every dom-ready listener has queued its injection; scripts
+    // execute in order, so this resolves once overlays and titlebar are in.
+    setImmediate(() => {
+      if (win.isDestroyed()) return;
+      runInPage(win, '0').catch(() => {}).finally(() => {
+        logInfo(`[SixteenCloud] Overlays injected after ${Date.now() - splashShownAt} ms`);
+        overlaysReady = true;
+        revealWhenReady();
+      });
+    });
   });
 
   // Fallback: if window still not visible after 12s, force show
+  // (goes through closeSplashAndShow so "start minimized" is still honoured).
   setTimeout(() => {
-    if (splashWindow && !splashWindow.isDestroyed()) {
-      splashWindow.close();
-      splashWindow = null;
-    }
-    if (!win.isDestroyed() && !win.isVisible()) {
-      logInfo('[SixteenCloud] Fallback: forcing window visible');
-      win.show();
-      win.focus();
-    }
+    if (!revealed) logInfo('[SixteenCloud] Fallback: forcing window visible');
+    closeSplashAndShow();
   }, 12000);
 
   // Override title on every page to "SixteenCloud"
@@ -348,8 +381,10 @@ function createWindow(): BrowserWindow {
     }
   });
 
-  // Inject overlay CSS and keybind listener once DOM is ready
-  win.webContents.on('did-finish-load', () => {
+  // Inject overlay CSS and keybind listener once DOM is ready. dom-ready, not
+  // did-finish-load: the latter also waits for every ad and tracker script on
+  // the page, which held the overlays back by a second or more.
+  win.webContents.on('dom-ready', () => {
     injectOverlaySystem(win);
     injectSpaLoadWatcher(win);
   });
@@ -359,7 +394,7 @@ function createWindow(): BrowserWindow {
 }
 
 function injectSpaLoadWatcher(win: BrowserWindow): void {
-  win.webContents.executeJavaScript(`
+  runInPage(win, `
     (function() {
       if (window.__scLoadWatcher) return;
       window.__scLoadWatcher = true;
@@ -426,7 +461,7 @@ function injectOverlaySystem(win: BrowserWindow): void {
 
   // Inject overlay container and toggle logic
   const initScript = getOverlayInitScript();
-  win.webContents.executeJavaScript(initScript).catch((e: any) => logWarn('executeJS error:', e?.message));
+  runInPage(win, initScript).catch((e: any) => logWarn('executeJS error:', e?.message));
 
   // Inject overlay panel contents
   injectOverlayPanels(win);
@@ -541,7 +576,7 @@ function injectWelcomeScreen(win: BrowserWindow): void {
   const escaped = tourHTML.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
   const stepsJson = JSON.stringify(tourSteps);
 
-  win.webContents.executeJavaScript(`
+  runInPage(win, `
     (function() {
       if (document.getElementById('sc-welcome-overlay')) return;
       var steps = ${stepsJson};
@@ -1085,6 +1120,82 @@ function getOverlayInitScript(): string {
       window.__scIconify(rail);
       new MutationObserver(function() { window.__scIconify(rail); }).observe(rail, { childList: true, subtree: true });
 
+      // Keep SoundCloud's content out from under the rail. SoundCloud lays its
+      // pages out at fixed widths (1240/1080/960) picked by viewport media
+      // queries, so the page cannot simply be narrowed. When the centred
+      // content would sit under the rail, shift it right just enough; when even
+      // that does not fit (narrow windows, Windows at 125-150% scaling), tuck
+      // the rail behind a slim handle at the edge so the content stays usable.
+      var railHandle = document.createElement('div');
+      railHandle.id = 'sc-rail-handle';
+      railHandle.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(railHandle);
+
+      var railPeekTimer = null;
+      function setRailPeek(on) {
+        if (railPeekTimer) { clearTimeout(railPeekTimer); railPeekTimer = null; }
+        rail.classList.toggle('sc-rail-peek', on);
+      }
+      railHandle.addEventListener('mouseenter', function() { setRailPeek(true); });
+      railHandle.addEventListener('mouseleave', function() {
+        // Give the pointer time to travel from the handle onto the rail.
+        railPeekTimer = setTimeout(function() { if (!rail.matches(':hover')) setRailPeek(false); }, 300);
+      });
+      rail.addEventListener('mouseleave', function() { setRailPeek(false); });
+
+      // Battery saver, driven by setupBatterySaver() in the main process.
+      window.__scSetPowerSaver = function(active) {
+        active = active === true;
+        window.__scPowerSaverActive = active;
+        document.documentElement.classList.toggle('sc-power-saver', active);
+        if (typeof window.__scVizSetPowerSaver === 'function') window.__scVizSetPowerSaver(active);
+      };
+
+      var railHidden = ${getStore()?.get('settings.railHidden') === true};
+      window.__scSetRailHidden = function(hidden) {
+        railHidden = !!hidden;
+        setRailPeek(false);
+        layoutRail();
+      };
+
+      var railLayoutQueued = false;
+      function layoutRail() {
+        railLayoutQueued = false;
+        var root = document.documentElement;
+        var content = document.querySelector('#app > .l-content') || document.querySelector('.l-content');
+        var railStyle = getComputedStyle(rail);
+        // Collapsed rail's right edge plus breathing room.
+        var gutter = (parseFloat(railStyle.left) || 0) + (parseFloat(railStyle.getPropertyValue('--sc-rail-w')) || 62) + 12;
+        var spare = root.clientWidth - (content ? content.offsetWidth : 0);
+        var shift = 0;
+        // Hidden by the user (rail keybind): same as no room, the handle stays.
+        var compact = railHidden;
+        if (!railHidden && content && spare / 2 < gutter) {
+          // Padding P moves the centred content's left edge to (P + spare) / 2.
+          if (spare >= gutter) shift = Math.ceil(2 * gutter - spare);
+          else compact = true;
+        }
+        var shiftValue = shift + 'px';
+        if (root.style.getPropertyValue('--sc-page-shift') !== shiftValue) root.style.setProperty('--sc-page-shift', shiftValue);
+        if (root.classList.contains('sc-page-shifted') !== shift > 0) root.classList.toggle('sc-page-shifted', shift > 0);
+        if (root.classList.contains('sc-rail-compact') !== compact) {
+          root.classList.toggle('sc-rail-compact', compact);
+          if (!compact) setRailPeek(false);
+        }
+      }
+      function queueRailLayout() {
+        if (railLayoutQueued) return;
+        railLayoutQueued = true;
+        // Not requestAnimationFrame: it stalls while the window is hidden, and
+        // a window restored from the tray at a new size must lay out at once.
+        setTimeout(layoutRail, 30);
+      }
+      window.addEventListener('resize', queueRailLayout);
+      // Body size changes when SoundCloud renders or swaps a page, which is
+      // also when .l-content appears or changes.
+      if (window.ResizeObserver) new ResizeObserver(queueRailLayout).observe(document.body);
+      queueRailLayout();
+
       var currentSection = null;
       var navItems = rail.querySelectorAll('.sc-nav-item');
       var panels = container.querySelectorAll('.sc-overlay-panel');
@@ -1254,14 +1365,14 @@ function injectOverlayPanels(win: BrowserWindow): void {
     }
   `).join('\n');
 
-  win.webContents.executeJavaScript(`
+  runInPage(win, `
     (function() {
       ${htmlInjection}
       ${scriptInjection}
     })();
   `).catch((e: any) => logWarn('executeJS error:', e?.message));
 
-  win.webContents.executeJavaScript(getVisualizerScript())
+  runInPage(win, getVisualizerScript())
     .catch((e: any) => logWarn('visualizer inject error:', e?.message));
 
   // Player features that depend on the visualizer's artwork finder.
@@ -1270,7 +1381,7 @@ function injectOverlayPanels(win: BrowserWindow): void {
     ['dynamic accent', getDynamicAccentScript()],
     ['search plus', getSearchPlusScript()],
   ] as const) {
-    win.webContents.executeJavaScript(script)
+    runInPage(win, script)
       .catch((e: any) => logWarn(`${name} inject error:`, e?.message));
   }
 }
@@ -1457,6 +1568,30 @@ function setupAdblocker(win: BrowserWindow): void {
   });
 }
 
+// --- Battery saver ---
+// On battery power the page drops the visualizer, live blur and animations
+// (window.__scSetPowerSaver in the overlay init script). On by default.
+function setupBatterySaver(win: BrowserWindow): void {
+  let lastActive: boolean | null = null;
+  const push = () => {
+    if (win.isDestroyed()) return;
+    const enabled = getStore()?.get('settings.batterySaver') !== false;
+    let onBattery = false;
+    try { onBattery = powerMonitor.isOnBatteryPower(); } catch { /* no power info */ }
+    const active = enabled && onBattery;
+    if (active !== lastActive) logInfo(`[Power] Battery saver ${active ? 'on' : 'off'} (setting ${enabled ? 'on' : 'off'}, on battery: ${onBattery})`);
+    lastActive = active;
+    runInPage(win, `window.__scSetPowerSaver && window.__scSetPowerSaver(${active})`).catch(() => {});
+  };
+  powerMonitor.on('on-battery', push);
+  powerMonitor.on('on-ac', push);
+  // After every page load, once the overlay and visualizer scripts are queued.
+  win.webContents.on('dom-ready', () => setImmediate(push));
+  getStore()?.onDidChange('settings', (next, prev) => {
+    if (next?.batterySaver !== prev?.batterySaver) push();
+  });
+}
+
 function injectAdBlockCSS(win: BrowserWindow): void {
   const css = AD_CSS_SELECTORS.map(s => `${s} { display: none !important; }`).join('\n');
   win.webContents.insertCSS(css);
@@ -1504,6 +1639,16 @@ function registerKeybinds(win: BrowserWindow): void {
     if (match('sidebar')) {
       event.preventDefault();
       if (!win.isDestroyed()) win.webContents.send(IPC_CHANNELS.SIDEBAR_TOGGLE);
+      return;
+    }
+
+    if (match('rail')) {
+      event.preventDefault();
+      const store = getStore();
+      const hidden = store?.get('settings.railHidden') !== true;
+      store?.set('settings.railHidden', hidden);
+      runInPage(win, `window.__scSetRailHidden && window.__scSetRailHidden(${hidden})`)
+        .catch((e: any) => logWarn('rail toggle error:', e?.message));
       return;
     }
 
@@ -2152,7 +2297,7 @@ function registerMediaKeys(win: BrowserWindow): void {
 }
 
 function injectMediaSession(win: BrowserWindow): void {
-  win.webContents.executeJavaScript(`
+  runInPage(win, `
     (function() {
       if (window.__scMediaSession) return;
       window.__scMediaSession = true;
@@ -2230,21 +2375,20 @@ function handleDeepLink(url: string): void {
 
 // The volume mixer reads the PulseAudio stream identity, which Chromium
 // hardcodes to "Chromium" / "chromium-browser" (PULSE_PROP_OVERRIDE only covers
-// the name). native/pulse-sixteencloud.c rewrites it to ours, and LD_PRELOAD is
-// only honoured at exec time, so the process restarts itself once with the shim
-// installed. The guard below makes that restart happen exactly once, and this
-// runs before the single-instance lock because the relaunched process takes it.
-function relaunchWithPulseIdentity(): boolean {
+// the name). native/pulse-sixteencloud.c rewrites it to ours. Only Chromium's
+// audio service talks to PulseAudio, and it runs unsandboxed, so it is started
+// with a plain fork+exec (not from the zygote) that inherits this process's
+// environment: putting the shim in LD_PRELOAD here, before any audio plays,
+// reaches it without restarting the whole app.
+function installPulseIdentityShim(): boolean {
   if (process.platform !== 'linux') return false;
   if (process.env.ELECTRON_RUN_AS_NODE) return false;
-  if (process.env.SIXTEENCLOUD_PULSE_SHIM === '1') return false;
 
   const built = path.join(__dirname, '..', 'native', 'pulse-sixteencloud.so');
   if (!fs.existsSync(built)) return false;
 
-  // Packaged builds load the shim from inside the bundle, and an AppImage mount
-  // is torn down with this process — stage a copy in the profile directory and
-  // preload that instead.
+  // Packaged builds keep the shim inside app.asar, which the dynamic loader
+  // cannot read: stage a copy in the profile directory and preload that.
   let shim = built;
   try {
     const staged = path.join(app.getPath('userData'), 'pulse-sixteencloud.so');
@@ -2255,25 +2399,15 @@ function relaunchWithPulseIdentity(): boolean {
     logWarn('[App] Could not stage PulseAudio identity shim:', err?.message || String(err));
   }
 
-  const preload = process.env.LD_PRELOAD ? `${shim}:${process.env.LD_PRELOAD}` : shim;
-  try {
-    spawn(process.execPath, process.argv.slice(1), {
-      env: { ...process.env, LD_PRELOAD: preload, SIXTEENCLOUD_PULSE_SHIM: '1' },
-      detached: true,
-      stdio: 'inherit',
-    }).unref();
-  } catch (err: any) {
-    logWarn('[App] PulseAudio identity relaunch failed:', err?.message || String(err));
-    return false;
+  const current = process.env.LD_PRELOAD || '';
+  if (!current.split(':').includes(shim)) {
+    process.env.LD_PRELOAD = current ? `${shim}:${current}` : shim;
   }
-
-  logInfo('[App] Relaunching with PulseAudio identity shim:', shim);
-  // Immediate and synchronous: the rest of this module must not run, or this
-  // process would take the single-instance lock the relaunched process needs.
-  process.exit(0);
+  logInfo('[App] PulseAudio identity shim armed for the audio service:', shim);
+  return true;
 }
 
-relaunchWithPulseIdentity();
+installPulseIdentityShim();
 
 // Prevent multiple instances — focus existing window instead
 const gotLock = app.requestSingleInstanceLock();
@@ -2363,6 +2497,18 @@ app.whenReady().then(() => {
   }
   setupGeoBypass();
   setupAdblocker(mainWindow);
+  setupBatterySaver(mainWindow);
+  const clickInPage = (selector: string) => () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      runInPage(mainWindow, `document.querySelector(${JSON.stringify(selector)})?.click();`)
+        .catch((e: any) => logWarn('taskbar action error:', e?.message));
+    }
+  };
+  setupWindowsTaskbar(mainWindow, {
+    previous: clickInPage('.skipControl__previous'),
+    playPause: clickInPage('.playControl'),
+    next: clickInPage('.skipControl__next'),
+  });
   setupDiscordRPC(mainWindow);
   setupOfflineCache(mainWindow);
   setupLinuxDesktopIntegration(mainWindow);
@@ -2390,10 +2536,10 @@ app.whenReady().then(() => {
   // Start mini-player track sync
   syncMiniPlayerTrackInfo();
 
-  // Inject media session and titlebar after page loads
-  mainWindow.webContents.on('did-finish-load', () => {
+  // Inject media session and titlebar as soon as the DOM is ready
+  mainWindow.webContents.on('dom-ready', () => {
     injectMediaSession(mainWindow!);
-    mainWindow!.webContents.executeJavaScript(getTitlebarScript()).catch((e: any) => logWarn('Titlebar inject error:', e?.message));
+    runInPage(mainWindow!, getTitlebarScript()).catch((e: any) => logWarn('Titlebar inject error:', e?.message));
   });
 
   app.on('activate', () => {

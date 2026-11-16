@@ -53,14 +53,17 @@ SixteenCloud wraps the SoundCloud web player in Electron and adds the parts a mu
 
 - **Ad-free playback** — request filtering plus cosmetic cleanup of promoted content.
 - **Synced lyrics** — LRC from LRCLIB, NetEase and QQ; plain lyrics from Genius, Musixmatch, lyrics.ovh, AZLyrics, ChartLyrics and lyrist. Smarter track matching, a sync-offset slider, an "other versions" picker and a blurred full-screen mode.
-- **Player tools** — skip promoted tracks and 30-second previews, playback speed, sleep timer, track-change notifications and ListenBrainz scrobbling.
+- **Player tools** — skip promoted tracks and 30-second previews, resume where you left off after a restart, playback speed, sleep timer, track-change notifications and ListenBrainz scrobbling.
 - **Accent from cover art** — the whole interface can take its colour from the playing track.
 - **Search shortcuts** — `/` or Ctrl+K focuses search; recent queries open as a dropdown.
 - **10-band equalizer** — Web Audio graph with presets, per-track persistence.
-- **Audio visualizer** — multiple modes, driven by the real analyser node, with a kick-reactive cover glow.
+- **Audio visualizer** — side bars, centre bars, progress wave, kick-reactive cover glow, oscilloscope, window edge glow, retro LED meter and a spectrogram behind the player; full-screen lyrics get the cover with a circular spectrum. All driven by the real analyser node and coloured from the cover art.
 - **Downloads** — tracks and playlists, HLS-aware, with a queue, progress and history.
 - **Discord Rich Presence** — current track, artist and artwork.
 - **Linux integration** — tray, MPRIS (`org.mpris.MediaPlayer2.sixteencloud`), media keys, desktop entry, notification controls.
+- **Windows taskbar** — previous / play-pause / next under the window thumbnail and track progress on the taskbar button.
+- **Battery saver** — on battery power the visualizer, blur and animations switch off (can be disabled in Settings).
+- **Side panel that stays out of the way** — the page makes room for it on mid-size windows, tucks it behind an edge handle on narrow ones; `Ctrl+G` hides it.
 - **Bookmarks sidebar** — saved tracks, sets and profiles with quick navigation.
 - **Themes & accents** — accent color, dark/light, custom CSS.
 - **Geo-unblock** — optional proxy routing for region-locked catalogs.

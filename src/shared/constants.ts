@@ -2,6 +2,10 @@ export const APP_NAME = 'SixteenCloud';
 // Platform-accurate UA (Windows / macOS / Linux, real Chromium version).
 export { CHROME_UA } from './user-agent';
 export const SOUNDCLOUD_URL = 'https://soundcloud.com';
+
+/** Player visualizer styles (settings dropdown, store validation, visualizer.ts). */
+export const VISUALIZER_TYPES = ['side', 'above', 'wave', 'glow', 'scope', 'ambient', 'led', 'spectrogram'] as const;
+export type VisualizerType = (typeof VISUALIZER_TYPES)[number];
 export const SOUNDCLOUD_API_V2 = 'https://api-v2.soundcloud.com';
 
 export const WINDOW_CONFIG = {
