@@ -76,21 +76,21 @@ Grab the latest asset from [Releases](https://github.com/npukolno/sixteencloud/r
 
 ### Windows
 
-Download **`SixteenCloud.Setup.3.0.2.exe`** and run it. The installer is per-user and does not require administrator rights. If SmartScreen warns about an unsigned publisher, choose **More info → Run anyway**.
+Download **`SixteenCloud.Setup.3.0.3.exe`** and run it. The installer is per-user and does not require administrator rights. If SmartScreen warns about an unsigned publisher, choose **More info → Run anyway**.
 
 ### Linux
 
 | Format | Install |
 | --- | --- |
-| **AppImage** | `chmod +x SixteenCloud.Setup.3.0.2.AppImage && ./SixteenCloud.Setup.3.0.2.AppImage` |
-| **Debian / Ubuntu** | `sudo dpkg -i SixteenCloud.Setup.3.0.2.deb` then `sudo apt -f install` if needed |
-| **Arch / pacman** | `sudo pacman -U SixteenCloud.Setup.3.0.2.pacman` |
+| **AppImage** | `chmod +x SixteenCloud.Setup.3.0.3.AppImage && ./SixteenCloud.Setup.3.0.3.AppImage` |
+| **Debian / Ubuntu** | `sudo dpkg -i SixteenCloud.Setup.3.0.3.deb` then `sudo apt -f install` if needed |
+| **Arch / pacman** | `sudo pacman -U SixteenCloud.Setup.3.0.3.pacman` |
 
 On Wayland, if the window does not appear, launch with `--ozone-platform=wayland` or run under XWayland.
 
 ### macOS
 
-Download **`SixteenCloud.Setup.3.0.2.zip`**, unzip and drag `SixteenCloud.app` to Applications. The build is unsigned and x86_64 only; clear the quarantine flag once:
+Download **`SixteenCloud.Setup.3.0.3.zip`**, unzip and drag `SixteenCloud.app` to Applications. The build is unsigned and x86_64 only; clear the quarantine flag once:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/SixteenCloud.app
@@ -106,7 +106,7 @@ xattr -dr com.apple.quarantine /Applications/SixteenCloud.app
 | Linux pacman | Not auto-installed by the app — update the package manually. |
 | macOS zip | Manual replacement (unsigned builds cannot self-install). |
 
-Updates are read from GitHub Releases of this repository. Older 2.x builds migrate to 3.0.2 through the same release feed.
+Updates are read from GitHub Releases of this repository. Older 2.x builds migrate to 3.0.3 through the same release feed.
 
 ## Build from source
 
