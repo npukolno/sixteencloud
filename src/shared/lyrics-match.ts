@@ -13,7 +13,7 @@ export function foldFancy(t: string): string {
   return t
     .normalize('NFKC')
     .replace(/[ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘʀꜱᴛᴜᴠᴡʏᴢ]/g, (c) => SMALL_CAPS[c] || c)
-    .replace(/[​-‍⁠﻿]/g, '')
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -67,14 +67,14 @@ export function similarity(a: string, b: string): number {
 function stripCredits(raw: string): string {
   return foldFancy(raw)
     .replace(NOISE_BRACKETS, '')
-    .replace(/\s*[\(\[\{]\s*(?:feat|ft|featuring|prod|produced|with|w\/)\b[^)\]}]*[\)\]\}]/gi, '')
-    .replace(/\s*[\/|]\s*(?:prod|produced|feat|ft|featuring|with)\b.*$/i, '')
+    .replace(/\s*[([{]\s*(?:feat|ft|featuring|prod|produced|with|w\/)\b[^)\]}]*[)\]}]/gi, '')
+    .replace(/\s*[/|]\s*(?:prod|produced|feat|ft|featuring|with)\b.*$/i, '')
     .replace(/\s+(?:prod\.?|produced by|feat\.?|ft\.?|featuring)\s+.*$/i, '')
     .replace(/\s*@\S+/g, '')
     .replace(/\s*\|\s*.*$/, '')
     .replace(/\s*#\S+/g, '')
     .replace(/[\s"“”/\\]+$/, '')
-    .replace(/\s*[\(\[\{]\s*$/, '')
+    .replace(/\s*[([{]\s*$/, '')
     .replace(/\s*[-–—]\s*$/, '')
     .replace(/\s+/g, ' ')
     .trim();

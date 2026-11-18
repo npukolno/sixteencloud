@@ -8,7 +8,7 @@ test('a dash that introduces credits does not split artist and title', () => {
   const q = parseSoundCloudTrack('sekairotten', '46°C - feat. pas de vie / prod. @saintexperiment');
   assert.deepEqual(q[0], { artist: 'sekairotten', title: '46°C' });
   assert.ok(q.some((x) => x.title === '46C'), 'degree sign is also tried without the symbol');
-  for (const x of q) assert.ok(!/[-(\[]\s*$/.test(x.title), `dangling separator in "${x.title}"`);
+  for (const x of q) assert.ok(!/[-([]\s*$/.test(x.title), `dangling separator in "${x.title}"`);
 });
 
 test('"Artist - Title" uploads by someone else are split', () => {
