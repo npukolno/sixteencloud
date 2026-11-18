@@ -8,7 +8,7 @@ export function getPlayerCoreScript(): string {
       if (window.__scPlayer) return;
 
       // ---- Config (store key "player"), shared by every player feature ----
-      window.__scCfg = { skipPromoted: true, skipPreviews: false, notifications: false, scrobble: false, speed: 1, resume: true, seekStep: 10 };
+      window.__scCfg = { skipPromoted: true, skipPreviews: false, notifications: false, scrobble: false, speed: 1, resume: true, seekStep: 10, reposts: 'show' };
       var api = window.sixteenCloud;
       if (api && typeof api.storeGet === 'function') {
         api.storeGet('player').then(function(p) {

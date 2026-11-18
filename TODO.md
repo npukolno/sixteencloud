@@ -40,4 +40,7 @@ lives in `src/renderer/overlays/wave.ts` but the panel is **not registered**
   SoundCloud's per-track graph rebuild no longer drops them. Not verified yet
   on a session where SoundCloud plays without Web Audio (then there is no
   graph to hook and the EQ panel says it is waiting).
-- Hiding reposts in the feed (needs the signed-in feed DOM).
+- Feed reposts (Player panel): detection and the "originals only" filter work
+  on the /stream API response (preload/api-tap.ts). Folding uses the feed DOM
+  (.soundList__item / a.soundTitle__title) and still needs a check on a
+  signed-in feed.

@@ -137,6 +137,8 @@ export interface StoreSchema {
     resume?: boolean;
     /** Seconds per seek step (5, 10, 15 or 30; default 10). */
     seekStep?: number;
+    /** Reposts in the home feed: shown, folded or dropped (default show). */
+    reposts?: 'show' | 'collapse' | 'hide';
   };
   searchHistory: string[];
   wave: {

@@ -35,6 +35,16 @@ export function getPlayerToolsOverlayHTML(): string {
       </div>
 
       <div class="sc-overlay-group" style="margin-top:16px">
+        <span class="sc-overlay-label">${t('player.reposts')}</span>
+        <div class="sc-pl-chips" id="sc-pl-reposts">
+          <button class="sc-overlay-btn sc-overlay-btn-secondary" data-mode="show">${t('player.reposts_show')}</button>
+          <button class="sc-overlay-btn sc-overlay-btn-secondary" data-mode="collapse">${t('player.reposts_collapse')}</button>
+          <button class="sc-overlay-btn sc-overlay-btn-secondary" data-mode="hide">${t('player.reposts_hide')}</button>
+        </div>
+        <div class="sc-pl-desc" style="margin-top:6px">${t('player.reposts_desc')}</div>
+      </div>
+
+      <div class="sc-overlay-group" style="margin-top:16px">
         <span class="sc-overlay-label">${t('player.speed')}</span>
         <div style="display:flex;align-items:center;gap:10px">
           <input type="range" min="0.5" max="2" step="0.05" value="1" id="sc-pl-speed" style="flex:1;accent-color:var(--sc-accent)">
@@ -107,7 +117,7 @@ export function getPlayerToolsOverlayScript(): string {
   const _tr = JSON.stringify(getScriptTranslations([
     'player.sleep_off', 'player.sleep_in', 'player.sleep_track', 'player.sleep_toast',
     'player.sec', 'player.ab_set_a', 'player.ab_set_b', 'player.ab_clear', 'player.ab_off', 'player.ab_waiting', 'player.ab_on',
-    'player.ab_toast_a', 'player.ab_toast_on', 'player.ab_toast_off', 'player.ab_hint', 'player.lb_ok', 'player.lb_bad', 'player.lb_none', 'player.lb_checking',
+    'player.ab_toast_a', 'player.ab_toast_on', 'player.ab_toast_off', 'player.ab_hint', 'player.reposts_reload', 'player.lb_ok', 'player.lb_bad', 'player.lb_none', 'player.lb_checking',
   ]));
   return `
     (function() {
@@ -138,6 +148,7 @@ export function getPlayerToolsOverlayScript(): string {
       var speed = $('#sc-pl-speed'), speedVal = $('#sc-pl-speed-val'), speedReset = $('#sc-pl-speed-reset');
       var notify = $('#sc-pl-notify'), scrobble = $('#sc-pl-scrobble'), scrobbleBox = $('#sc-pl-scrobble-box');
       var lbToken = $('#sc-pl-lb-token'), lbSave = $('#sc-pl-lb-save'), lbStatus = $('#sc-pl-lb-status');
+      var repostChips = $('#sc-pl-reposts');
       var sleepChips = $('#sc-pl-sleep-chips'), sleepStatus = $('#sc-pl-sleep-status'), sleepCancel = $('#sc-pl-sleep-cancel');
 
       function cfg() { return window.__scCfg || {}; }
@@ -149,6 +160,9 @@ export function getPlayerToolsOverlayScript(): string {
         notify.checked = !!c.notifications;
         scrobble.checked = !!c.scrobble;
         scrobbleBox.style.display = scrobble.checked ? 'block' : 'none';
+        Array.prototype.forEach.call(repostChips.querySelectorAll('button'), function(b) {
+          b.classList.toggle('on', b.getAttribute('data-mode') === (c.reposts || 'show'));
+        });
         speed.value = String(c.speed || 1);
         speedVal.textContent = (Number(speed.value)).toFixed(2) + 'x';
       }
@@ -163,6 +177,19 @@ export function getPlayerToolsOverlayScript(): string {
         window.__scCfgSet('scrobble', scrobble.checked);
         scrobbleBox.style.display = scrobble.checked ? 'block' : 'none';
         if (scrobble.checked) refreshScrobbleStatus();
+      });
+
+      // ---- Feed reposts (api-tap.ts filters, reposts.ts folds) ----
+      repostChips.addEventListener('click', function(e) {
+        var b = e.target.closest ? e.target.closest('button') : null;
+        if (!b) return;
+        var m = b.getAttribute('data-mode');
+        var prev = cfg().reposts || 'show';
+        if (m === prev) return;
+        window.__scCfgSet('reposts', m);
+        if (window.__scReposts) window.__scReposts.set(m);
+        syncUi();
+        if (window.__scToast && (m === 'hide' || prev === 'hide')) window.__scToast(_t('player.reposts_reload'));
       });
 
       // ---- Playback speed ----

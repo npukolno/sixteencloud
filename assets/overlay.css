@@ -2287,6 +2287,40 @@ html.sc-power-saver .sc-rail-search {
   cursor: progress;
 }
 
+/* ===== Folded feed reposts (reposts.ts) ===== */
+.sc-repost-folded:not(.sc-repost-open) {
+  position: relative;
+  opacity: 0.6;
+  max-height: 64px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: opacity 150ms ease;
+}
+
+.sc-repost-folded:not(.sc-repost-open):hover {
+  opacity: 0.9;
+}
+
+.sc-repost-folded:not(.sc-repost-open) .sound__waveform,
+.sc-repost-folded:not(.sc-repost-open) .sound__footer,
+.sc-repost-folded:not(.sc-repost-open) .sound__artwork,
+.sc-repost-folded:not(.sc-repost-open) .commentForm {
+  display: none !important;
+}
+
+.sc-repost-folded:not(.sc-repost-open)::after {
+  content: attr(data-sc-rp-label);
+  position: absolute;
+  right: 8px;
+  top: 6px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  font-size: 11px;
+  background: var(--sc-surface-raised);
+  color: var(--sc-text-muted);
+  pointer-events: none;
+}
+
 /* ===== Toasts (toast.ts) ===== */
 #sc-toasts {
   position: fixed;

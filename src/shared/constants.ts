@@ -197,6 +197,7 @@ export const STORE_DEFAULTS = {
     scrobble: false,
     speed: 1,
     seekStep: 10,
+    reposts: 'show' as 'show' | 'collapse' | 'hide',
   },
   searchHistory: [] as string[],
   wave: {
