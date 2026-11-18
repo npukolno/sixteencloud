@@ -1,10 +1,10 @@
-import { app, ipcMain, BrowserWindow } from 'electron';
+import { app, ipcMain, net, BrowserWindow } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { createHash, randomBytes } from 'crypto';
 import { IPC_CHANNELS } from '../shared/constants';
 import { logInfo, logWarn } from './logger';
-import { assertMainRenderer, getStore, resolveTrackStream } from './ipc';
+import { assertMainRenderer, getStore, resolveTrackStream, streamResponseToFile } from './ipc';
 import { isAllowedMediaUrl, isTrustedSoundCloudUrl } from '../shared/security';
 import type { TrackInfo } from '../shared/types';
 
@@ -43,86 +43,6 @@ function getCachedFilePath(trackId: string): string {
 function getTotalCacheSize(): number {
   const tracks = getTracksFromStore();
   return tracks.reduce((sum, t) => sum + (t.fileSize || 0), 0);
-}
-
-/**
- * Stream a fetch response to disk while enforcing the cache size limit.
- * The caller is responsible for renaming the temporary file after this
- * function succeeds, so a failed download can never become a cache entry.
- */
-async function streamResponseToFile(response: Response, filePath: string, maxBytes: number): Promise<number> {
-  const declared = Number(response.headers.get('content-length') || 0);
-  if (declared > maxBytes) throw new Error(`Response exceeds ${maxBytes} byte limit`);
-  if (!response.body) throw new Error('Response body unavailable');
-
-  const output = fs.createWriteStream(filePath, { flags: 'wx' });
-  const reader = response.body.getReader();
-  let total = 0;
-  let outputError: Error | undefined;
-  const onOutputError = (error: Error) => { outputError = error; };
-  // Keep a listener for the whole transfer: createWriteStream can emit an
-  // asynchronous open/write error while no drain/end handler is installed.
-  output.on('error', onOutputError);
-
-  const waitForDrain = (): Promise<void> => new Promise((resolve, reject) => {
-    if (outputError) {
-      reject(outputError);
-      return;
-    }
-    const onDrain = () => {
-      output.removeListener('error', onError);
-      resolve();
-    };
-    const onError = (error: Error) => {
-      output.removeListener('drain', onDrain);
-      reject(error);
-    };
-    output.once('drain', onDrain);
-    output.once('error', onError);
-  });
-
-  const finish = (): Promise<void> => new Promise((resolve, reject) => {
-    if (outputError) {
-      reject(outputError);
-      return;
-    }
-    const onError = (error: Error) => reject(error);
-    output.once('error', onError);
-    output.end(() => {
-      output.removeListener('error', onError);
-      resolve();
-    });
-  });
-
-  try {
-    while (true) {
-      if (outputError) throw outputError;
-      const part = await reader.read();
-      if (part.done) break;
-
-      const chunk = Buffer.from(part.value);
-      total += chunk.length;
-      if (total > maxBytes) {
-        await reader.cancel();
-        throw new Error(`Response exceeds ${maxBytes} byte limit`);
-      }
-      if (!output.write(chunk)) await waitForDrain();
-      if (outputError) throw outputError;
-    }
-    await finish();
-    return total;
-  } catch (error) {
-    try { await reader.cancel(); } catch { /* response already closed */ }
-    const closePromise = output.closed
-      ? Promise.resolve()
-      : new Promise<void>(resolve => output.once('close', resolve));
-    output.destroy();
-    await closePromise;
-    throw error;
-  } finally {
-    reader.releaseLock();
-    output.removeListener('error', onOutputError);
-  }
 }
 
 function enforceSizeLimit(): void {
@@ -180,7 +100,6 @@ async function cacheTrack(data: OfflineCacheRequest): Promise<{ success: boolean
   const tempFilePath = `${filePath}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
 
   try {
-    const { net } = require('electron');
     const resp = await net.fetch(data.audioUrl);
     if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
 

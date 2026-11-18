@@ -6,7 +6,7 @@
   "homepage": "https://ocb2016.me",
   "main": "dist/main/main.js",
   "scripts": {
-    "build": "node ./node_modules/typescript/bin/tsc && node scripts/build-preload.mjs && node scripts/build-pulse-shim.mjs",
+    "build": "node scripts/clean.mjs && node ./node_modules/typescript/bin/tsc && node scripts/build-preload.mjs && node scripts/build-pulse-shim.mjs",
     "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
     "test": "npm run build && node --test test/**/*.test.mjs",
     "start": "npm run build && electron .",

@@ -387,10 +387,12 @@ export function getDownloaderOverlayScript(): string {
             : p.status === 'tagging' ? _t('downloader.tagging')
             : p.status === 'zipping' ? _t('downloader.zipping')
             : p.status;
-          playlistStatus.textContent = idx + '/' + total + ' — ' + stageText;
+          // Tracks download in parallel, so count finished ones, not the index.
+          var done = typeof p.playlistCompleted === 'number' ? p.playlistCompleted : p.playlistIndex;
+          playlistStatus.textContent = Math.min(total, done + 1) + '/' + total + ' — ' + stageText;
 
-          // Overall progress: completed tracks + current track fraction
-          var overallPercent = Math.round(((p.playlistIndex) / total) * 100 + (p.percent || 0) / total);
+          // Overall progress: finished tracks + the reporting track's fraction
+          var overallPercent = Math.min(100, Math.round((done / total) * 100 + (p.status === 'complete' ? 0 : (p.percent || 0) / total)));
           playlistBar.style.width = overallPercent + '%';
           playlistPercent.textContent = overallPercent + '%';
 
