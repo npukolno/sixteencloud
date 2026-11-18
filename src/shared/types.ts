@@ -57,6 +57,14 @@ export interface SidebarBookmark {
   name: string;
   url: string;
   type: 'track' | 'playlist' | 'artist';
+  /** Cover thumbnail (sndcdn.com only). */
+  artwork?: string;
+  /** Shown in the Pinned section at the top. */
+  pinned?: boolean;
+  /** Folder name; unset means "no folder". */
+  folder?: string;
+  /** Timecode bookmark: seconds into the track to jump to. */
+  time?: number;
 }
 
 export interface MiniPlayerState {

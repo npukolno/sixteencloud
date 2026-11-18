@@ -5,6 +5,7 @@ import type { DownloadRequest } from '../../shared/types';
 import { isAllowedMediaUrl, isTrustedSoundCloudUrl } from '../../shared/security';
 import { KEYBIND_ACTIONS, parseCombo } from '../../shared/keybinds';
 import { isAudioFxState } from '../../shared/audio-fx';
+import { isBookmarkList } from '../../shared/bookmarks';
 
 export const STORE_KEYS: ReadonlySet<string> = new Set([
   'language', 'firstLaunch', 'geoBypass', 'geoBypass.enabled', 'geoBypass.proxyUrl', 'geoBypass.spoofCountry',
@@ -85,6 +86,10 @@ export function validateStoreValue(key: string, value: unknown): void {
         state.bands.some((band: unknown) => typeof band !== 'number' || !Number.isFinite(band) || band < -12 || band > 12)) {
       throw new Error('Invalid equalizer state');
     }
+  }
+  if (key === 'sidebar.bookmarks' && !isBookmarkList(value)) throw new Error('Invalid bookmarks');
+  if (key === 'sidebar' && (!value || typeof value !== 'object' || !isBookmarkList((value as { bookmarks?: unknown }).bookmarks))) {
+    throw new Error('Invalid sidebar state');
   }
   if (key === 'audioFx' && !isAudioFxState(value)) throw new Error('Invalid audio effects state');
   if (key === 'visualizer') {
