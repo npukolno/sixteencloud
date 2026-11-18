@@ -115,6 +115,8 @@ export interface StoreSchema {
     railHidden?: boolean;
     /** Drop the visualizer, blur and animations while on battery (default on). */
     batterySaver?: boolean;
+    /** Cover-palette glow above the player bar (default on). */
+    ambient?: boolean;
   };
   history: {
     enabled: boolean;

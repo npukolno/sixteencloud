@@ -12,7 +12,7 @@ export const STORE_KEYS: ReadonlySet<string> = new Set([
   'adblocker', 'adblocker.enabled', 'adblocker.blockedCount', 'adblocker.customRules', 'adblocker.whitelist',
   'adblocker.remoteDomains', 'adblocker.lastUpdated', 'downloader', 'downloader.outputDir', 'downloader.quality',
   'downloader.history', 'settings', 'settings.startMinimized', 'settings.launchOnStartup', 'settings.accentColor',
-  'settings.dynamicAccent', 'settings.batterySaver', 'player', 'player.skipPromoted', 'player.skipPreviews', 'player.notifications', 'player.scrobble', 'player.resume', 'player.speed', 'searchHistory', 'wave',
+  'settings.dynamicAccent', 'settings.batterySaver', 'settings.ambient', 'player', 'player.skipPromoted', 'player.skipPreviews', 'player.notifications', 'player.scrobble', 'player.resume', 'player.speed', 'searchHistory', 'wave',
   'settings.autoUpdate', 'settings.keybinds', 'history', 'history.enabled', 'history.maxTracks', 'history.tracks', 'history.stats', 'lyrics',
   'lyrics.fontSize', 'themes', 'themes.active', 'themes.custom', 'customCss', 'customCss.code', 'equalizer', 'visualizer',
   'sidebar',
@@ -26,7 +26,7 @@ export const READ_ONLY_STORE_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 const BOOLEAN_KEYS: ReadonlySet<string> = new Set([
-  'settings.dynamicAccent', 'settings.batterySaver', 'player.skipPromoted', 'player.skipPreviews',
+  'settings.dynamicAccent', 'settings.batterySaver', 'settings.ambient', 'player.skipPromoted', 'player.skipPreviews',
   'player.notifications', 'player.scrobble', 'player.resume',
 ]);
 

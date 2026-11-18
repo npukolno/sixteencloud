@@ -2035,3 +2035,94 @@ html.sc-power-saver .sc-rail-search {
   transform: translateY(-1px);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
 }
+
+/* ===== Toasts (toast.ts) ===== */
+#sc-toasts {
+  position: fixed;
+  left: 50%;
+  bottom: 64px;
+  transform: translateX(-50%);
+  z-index: 100002;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.sc-toast {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: min(520px, 80vw);
+  padding: 9px 14px;
+  border-radius: 12px;
+  background: var(--sc-surface-raised);
+  color: var(--sc-text);
+  border: 1px solid var(--sc-border-strong);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  pointer-events: auto;
+  cursor: default;
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  transition: opacity 220ms ease, transform 260ms cubic-bezier(.2, .9, .25, 1);
+}
+
+.sc-toast.sc-toast-in {
+  opacity: 1;
+  transform: none;
+}
+
+.sc-toast-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-toast-dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sc-accent);
+}
+
+.sc-toast-success .sc-toast-dot { background: var(--sc-success); }
+.sc-toast-error .sc-toast-dot { background: var(--sc-danger); }
+
+/* ===== Ambient cover glow above the player bar (ambient.ts) ===== */
+.sc-ambient-layer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 48px;
+  height: 110px;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+
+.sc-ambient-layer.on {
+  opacity: 1;
+}
+
+body.sc-overlay-open .sc-ambient-layer {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-toast,
+  .sc-ambient-layer {
+    transition: none;
+  }
+}
+
+html.sc-power-saver .sc-toast,
+html.sc-power-saver .sc-ambient-layer {
+  transition: none !important;
+}

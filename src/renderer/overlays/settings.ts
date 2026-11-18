@@ -146,6 +146,17 @@ export function getSettingsOverlayHTML(): string {
       </div>
 
       <div class="sc-overlay-toggle" style="margin-top: 16px;">
+        <div>
+          <span class="sc-overlay-toggle-label">${t('settings.ambient')}</span>
+          <div style="font-size:11px;opacity:.6;margin-top:2px;">${t('settings.ambient_desc')}</div>
+        </div>
+        <label class="sc-overlay-switch">
+          <input type="checkbox" id="sc-set-ambient" checked>
+          <span class="sc-overlay-switch-slider"></span>
+        </label>
+      </div>
+
+      <div class="sc-overlay-toggle" style="margin-top: 16px;">
         <span class="sc-overlay-toggle-label">${t('settings.auto_update')}</span>
         <label class="sc-overlay-switch">
           <input type="checkbox" id="sc-set-autoupdate" checked>
@@ -229,6 +240,7 @@ export function getSettingsOverlayScript(): string {
       const visualizerTypeItems = panel.querySelectorAll('.sc-custom-dropdown-item');
       const autoUpdate = panel.querySelector('#sc-set-autoupdate');
       const batterySaver = panel.querySelector('#sc-set-battery-saver');
+      const ambient = panel.querySelector('#sc-set-ambient');
       const lyricsRing = panel.querySelector('#sc-set-viz-lyrics-ring');
       const checkUpdateBtn = panel.querySelector('#sc-set-check-update');
       const updateStatus = panel.querySelector('#sc-set-update-status');
@@ -333,6 +345,7 @@ export function getSettingsOverlayScript(): string {
         if (!dynAccent.checked) window.scApplyAccent(_hsvToHex(_hsv.h, _hsv.s, _hsv.v));
         autoUpdate.checked = s.autoUpdate !== false;
         batterySaver.checked = s.batterySaver !== false;
+        ambient.checked = s.ambient !== false;
       });
 
       dynAccent.addEventListener('change', function() {
@@ -488,6 +501,11 @@ export function getSettingsOverlayScript(): string {
 
       batterySaver.addEventListener('change', function() {
         api.storeSet('settings.batterySaver', batterySaver.checked);
+      });
+
+      ambient.addEventListener('change', function() {
+        api.storeSet('settings.ambient', ambient.checked);
+        if (window.__scAmbient) window.__scAmbient.set(ambient.checked);
       });
 
       var downloadBtn = panel.querySelector('#sc-set-download-update');

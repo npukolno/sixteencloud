@@ -31,6 +31,7 @@ import { getVisualizerScript } from '../renderer/overlays/visualizer';
 import { getPlayerCoreScript } from '../renderer/overlays/player-core';
 import { getDynamicAccentScript } from '../renderer/overlays/dynamic-accent';
 import { getSearchPlusScript } from '../renderer/overlays/search-plus';
+import { getExtrasScripts } from '../renderer/overlays/extras';
 import { getPlayerToolsOverlayHTML, getPlayerToolsOverlayScript } from '../renderer/overlays/player-tools';
 import { isSafeExternalUrl, isTrustedOAuthUrl, isTrustedSoundCloudUrl } from '../shared/security';
 import { matchesCombo, resolveKeybinds, type KeybindAction } from '../shared/keybinds';
@@ -1380,7 +1381,8 @@ function injectOverlayPanels(win: BrowserWindow): void {
     ['player core', getPlayerCoreScript()],
     ['dynamic accent', getDynamicAccentScript()],
     ['search plus', getSearchPlusScript()],
-  ] as const) {
+    ...getExtrasScripts(),
+  ]) {
     runInPage(win, script)
       .catch((e: any) => logWarn(`${name} inject error:`, e?.message));
   }
