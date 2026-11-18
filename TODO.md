@@ -1,10 +1,12 @@
 # TODO / deprecated
 
-## Wave (deprecated, hidden from the UI)
+## Wave (shelved, removed from the main code)
 
-An endless "personal radio" in the spirit of Yandex Music's *My Wave*. The code
-lives in `src/renderer/overlays/wave.ts` but the panel is **not registered**
-(`src/main/main.ts`), so it cannot be opened from the app.
+An endless "personal radio" in the spirit of Yandex Music's *My Wave*. The
+code was removed from the main line; the last full version lives on the
+`archive/wave` branch: `src/renderer/overlays/wave.ts`, its i18n keys, the
+`wave` store key and the `window.__scRelatedOverride` hook in
+`src/preload/api-tap.ts`. Bring it back from there if the work resumes.
 
 ### What exists
 - Candidate pool from SoundCloud's own recommenders: track stations
@@ -15,11 +17,10 @@ lives in `src/renderer/overlays/wave.ts` but the panel is **not registered**
   skip / finished), ranking with variety rules (no same artist back to back),
   language filter (Cyrillic detection), "familiar <-> new" slider.
 - 3D logo UI, like/dislike/skip, heart animation.
-- **Queue injection**: `src/preload/api-tap.ts` can answer SoundCloud's
+- **Queue injection** (archive branch): `src/preload/api-tap.ts` could answer SoundCloud's
   `/tracks/{id}/related` XHR with our own list through
   `window.__scRelatedOverride(trackId, data, url)`. SoundCloud's autoplay
   follows that list, so no page navigation is needed after the first track.
-  The hook is inert while nothing defines `__scRelatedOverride`.
 
 ### Why it was shelved
 - Playback start relied on opening the track page and pressing its big play

@@ -200,16 +200,6 @@ export const STORE_DEFAULTS = {
     reposts: 'show' as 'show' | 'collapse' | 'hide',
   },
   searchHistory: [] as string[],
-  wave: {
-    moods: [] as string[],
-    tag: '',
-    lang: 'all',
-    explore: 50,
-    avoidHeard: true,
-    artists: {} as Record<string, number>,
-    tags: {} as Record<string, number>,
-    seen: [] as string[],
-  },
   themes: {
     active: 'default' as string,
     custom: {} as Record<string, any>,

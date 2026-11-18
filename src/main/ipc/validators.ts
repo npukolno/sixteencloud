@@ -14,7 +14,7 @@ export const STORE_KEYS: ReadonlySet<string> = new Set([
   'adblocker', 'adblocker.enabled', 'adblocker.blockedCount', 'adblocker.customRules', 'adblocker.whitelist',
   'adblocker.remoteDomains', 'adblocker.lastUpdated', 'downloader', 'downloader.outputDir', 'downloader.quality',
   'downloader.history', 'settings', 'settings.startMinimized', 'settings.launchOnStartup', 'settings.accentColor',
-  'settings.dynamicAccent', 'settings.batterySaver', 'settings.ambient', 'player', 'player.skipPromoted', 'player.skipPreviews', 'player.notifications', 'player.scrobble', 'player.resume', 'player.speed', 'player.seekStep', 'player.reposts', 'searchHistory', 'wave',
+  'settings.dynamicAccent', 'settings.batterySaver', 'settings.ambient', 'player', 'player.skipPromoted', 'player.skipPreviews', 'player.notifications', 'player.scrobble', 'player.resume', 'player.speed', 'player.seekStep', 'player.reposts', 'searchHistory',
   'settings.autoUpdate', 'settings.keybinds', 'history', 'history.enabled', 'history.maxTracks', 'history.tracks', 'history.stats', 'lyrics',
   'lyrics.fontSize', 'themes', 'themes.active', 'themes.custom', 'customCss', 'customCss.code', 'equalizer', 'audioFx', 'visualizer',
   'sidebar',
@@ -52,9 +52,6 @@ export function validateStoreValue(key: string, value: unknown): void {
   if (key === 'player.reposts' && value !== 'show' && value !== 'collapse' && value !== 'hide') throw new Error('Invalid repost mode');
   if (key === 'player.seekStep' && value !== 5 && value !== 10 && value !== 15 && value !== 30) {
     throw new Error('Invalid seek step');
-  }
-  if (key === 'wave') {
-    if (!value || typeof value !== 'object' || Array.isArray(value) || JSON.stringify(value).length > 250000) throw new Error('Invalid wave data');
   }
   if (key === 'searchHistory' && (!Array.isArray(value) || value.length > 30 || value.some((v) => typeof v !== 'string' || v.length > 200))) {
     throw new Error('Invalid search history');

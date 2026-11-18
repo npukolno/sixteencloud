@@ -7,9 +7,9 @@
 //   window.__scTracks.flagged[path] -> 'promoted' | 'preview'
 //   window.__scTracks.clientId / .auth -> credentials the page already uses
 //   window.__scTracks.reposts[path]  -> true for items the feed shows as reposts
-// Promoted-track skipping, the Wave radio and lyrics cleanup read from it.
+// Promoted-track skipping and lyrics cleanup read from it.
 //
-// The one response it rewrites (besides the Wave hook) is the home feed
+// The one response it rewrites is the home feed
 // (/stream) when the user chose to hide reposts: repost items are dropped
 // before SoundCloud renders the page. The choice is read from localStorage
 // ('sc16:reposts', mirrored from the player.reposts setting by the page)
@@ -114,8 +114,6 @@ export function installApiTap(): void {
     } catch (e) { /* noop */ }
   }
 
-  const RELATED_RE = /\/tracks\/(\d+)\/related(?:\?|$)/;
-
   // ---- Feed reposts ----
   function repostMode(): string {
     try { return String(w.localStorage.getItem('sc16:reposts') || 'show'); } catch (e) { return 'show'; }
@@ -172,28 +170,6 @@ export function installApiTap(): void {
           });
         }
       } catch (e) { /* noop */ }
-      // SoundCloud's autoplay follows the "related" list of the playing track.
-      // A feature (Wave) may register window.__scRelatedOverride(trackId, data)
-      // to substitute that list; returning null leaves the response untouched.
-      try {
-        const m = url.indexOf('api-v2.soundcloud.com') !== -1 ? RELATED_RE.exec(url) : null;
-        if (m && typeof w.__scRelatedOverride === 'function') {
-          noteRequest(url, (init && init.headers) || (input && input.headers));
-          return p.then(async (res) => {
-            try {
-              if (!res || !res.ok) return res;
-              const data = await res.clone().json();
-              const out = await w.__scRelatedOverride(Number(m[1]), data, url);
-              if (out && typeof out === 'object') {
-                ingest(out);
-                return new Response(JSON.stringify(out), { status: 200, statusText: 'OK', headers: { 'content-type': 'application/json' } });
-              }
-              ingest(data);
-            } catch (e) { /* fall through to the original response */ }
-            return res;
-          });
-        }
-      } catch (e) { /* noop */ }
       try {
         if (url.indexOf('api-v2.soundcloud.com') !== -1) {
           noteRequest(url, (init && init.headers) || (input && input.headers));
@@ -220,40 +196,6 @@ export function installApiTap(): void {
     const nativeResp = Object.getOwnPropertyDescriptor(XHR.prototype, 'response');
     XHR.prototype.open = function (this: any, method: string, url: string) {
       try {
-        // SoundCloud loads the related list over XHR: expose the Wave override
-        // through the response getters so the page's own handlers see it.
-        const rm = typeof url === 'string' && url.indexOf('api-v2.soundcloud.com') !== -1 ? RELATED_RE.exec(url) : null;
-        if (rm && nativeText && nativeText.get && nativeResp && nativeResp.get) {
-          const self = this;
-          let computed = false;
-          let replaced: string | null = null;
-          const compute = (): string | null => {
-            if (computed) return replaced;
-            if (self.readyState !== 4 || self.status !== 200 || typeof w.__scRelatedOverride !== 'function') return null;
-            computed = true;
-            try {
-              const data = JSON.parse(nativeText.get!.call(self));
-              const out = w.__scRelatedOverride(Number(rm[1]), data, url);
-              if (out && typeof out === 'object' && typeof out.then !== 'function') {
-                replaced = JSON.stringify(out);
-                ingest(out);
-              }
-            } catch (e) { /* keep the original response */ }
-            return replaced;
-          };
-          Object.defineProperty(this, 'responseText', {
-            configurable: true,
-            get: function () { const r = compute(); return r !== null ? r : nativeText.get!.call(self); },
-          });
-          Object.defineProperty(this, 'response', {
-            configurable: true,
-            get: function () {
-              const r = compute();
-              if (r === null) return nativeResp.get!.call(self);
-              return self.responseType === 'json' ? JSON.parse(r) : r;
-            },
-          });
-        }
         const hideReposts = typeof url === 'string' && isStreamUrl(url) && repostMode() === 'hide';
         if (hideReposts && nativeText && nativeText.get && nativeResp && nativeResp.get) {
           const self = this;

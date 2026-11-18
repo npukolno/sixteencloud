@@ -149,16 +149,6 @@ export interface StoreSchema {
     reposts?: 'show' | 'collapse' | 'hide';
   };
   searchHistory: string[];
-  wave: {
-    moods: string[];
-    tag: string;
-    lang: string;
-    explore: number;
-    avoidHeard: boolean;
-    artists: Record<string, number>;
-    tags: Record<string, number>;
-    seen: string[];
-  };
   themes: {
     active: string;
     custom: Record<string, { name: string; palette: Record<string, string> }>;
