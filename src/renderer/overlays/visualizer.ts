@@ -167,12 +167,12 @@ export function getVisualizerScript(): string {
         }
         var bar = document.querySelector('.playbackTimeline__progressBar');
         if (bar) {
-          var m = /([\d.]+)%/.exec(bar.style.width || '');
+          var m = /([\\d.]+)%/.exec(bar.style.width || '');
           if (m) return clamp(parseFloat(m[1]) / 100, 0, 1);
         }
         var handle = document.querySelector('.playbackTimeline__progressHandle');
         if (handle) {
-          var hm = /([\d.]+)%/.exec(handle.style.left || '');
+          var hm = /([\\d.]+)%/.exec(handle.style.left || '');
           if (hm) return clamp(parseFloat(hm[1]) / 100, 0, 1);
         }
         var wrap = document.querySelector('.playbackTimeline__progressWrapper');

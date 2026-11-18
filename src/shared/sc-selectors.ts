@@ -10,6 +10,8 @@ export const SC = {
   PLAYER_BAR: '.playControls',
   TITLE_LINK: '.playbackSoundBadge__titleLink',
   ARTIST_LINK: '.playbackSoundBadge__lightLink',
+  /** Like button next to the playing track (has `.sc-button-selected` when liked). */
+  LIKE: '.playbackSoundBadge__like',
   AVATAR: '.playbackSoundBadge__avatar',
   /** Element whose inline style carries the artwork as a background-image. */
   AVATAR_ART: '.playbackSoundBadge__avatar .image__full, .playbackSoundBadge__avatar span[style*="background-image"]',

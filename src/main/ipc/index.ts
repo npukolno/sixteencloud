@@ -7,7 +7,7 @@ import { setupDownloaderIPC } from './downloader';
 import { setupHistoryIPC } from './history';
 import { setupLyricsIPC } from './lyrics';
 
-export { getStore, getEncryptionKey, getSecret, setSecret } from './store';
+export { initStore, getStore, getEncryptionKey, getSecret, setSecret } from './store';
 export { assertMainRenderer, safeSend } from './guard';
 export { readResponseBuffer, streamResponseToFile } from './net';
 export { resolveTrackStream, type ResolvedTrackStream } from './soundcloud-api';

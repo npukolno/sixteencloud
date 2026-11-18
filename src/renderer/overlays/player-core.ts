@@ -75,7 +75,7 @@ export function getPlayerCoreScript(): string {
       function coverSrc() {
         var el = q('.playbackSoundBadge__avatar .image') || q('.playbackSoundBadge__avatar span[style*="background-image"]');
         if (!el) return '';
-        var m = /url\(['"]?([^'")]+)['"]?\)/.exec(el.getAttribute('style') || '');
+        var m = /url\\(['"]?([^'")]+)['"]?\\)/.exec(el.getAttribute('style') || '');
         return m ? m[1] : '';
       }
       function coverCheck() {

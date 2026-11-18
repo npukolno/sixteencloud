@@ -29,6 +29,19 @@ try {
   console.warn('[SixteenCloud] api tap injection failed:', e);
 }
 
+type Unsubscribe = () => void;
+
+/**
+ * Listen on a main → renderer channel. Returns an unsubscribe function, so a
+ * script injected more than once (e.g. the update banner after every page
+ * load) can drop its old callback instead of stacking a new one.
+ */
+function subscribe<T>(channel: string, callback: (payload: T) => void): Unsubscribe {
+  const listener = (_event: Electron.IpcRendererEvent, payload: T) => callback(payload);
+  ipcRenderer.on(channel, listener);
+  return () => { ipcRenderer.removeListener(channel, listener); };
+}
+
 const api = {
   // Store
   storeGet: (key: string): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.STORE_GET, key),
@@ -43,18 +56,16 @@ const api = {
   // Discord
   discordToggle: (enabled: boolean): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.DISCORD_TOGGLE, enabled),
-  onDiscordState: (callback: (state: unknown) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.DISCORD_STATE, (_event, state) => callback(state));
-  },
+  onDiscordState: (callback: (state: unknown) => void): Unsubscribe =>
+    subscribe<unknown>(IPC_CHANNELS.DISCORD_STATE, callback),
 
   // Adblocker
   adToggle: (enabled: boolean): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.AD_TOGGLE, enabled),
   adUpdateLists: (): Promise<{success: boolean; count?: number; error?: string}> =>
     ipcRenderer.invoke(IPC_CHANNELS.AD_UPDATE_LISTS),
-  onAdBlockCount: (callback: (count: number) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.AD_BLOCK_COUNT, (_event, count: number) => callback(count));
-  },
+  onAdBlockCount: (callback: (count: number) => void): Unsubscribe =>
+    subscribe<number>(IPC_CHANNELS.AD_BLOCK_COUNT, callback),
 
   // Auth
   authSetToken: (token: string): Promise<unknown> =>
@@ -63,9 +74,8 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.AUTH_VALIDATE),
   authLogout: (): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGOUT),
-  onAuthState: (callback: (state: unknown) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.AUTH_STATE, (_event, state) => callback(state));
-  },
+  onAuthState: (callback: (state: unknown) => void): Unsubscribe =>
+    subscribe<unknown>(IPC_CHANNELS.AUTH_STATE, callback),
 
   // Downloader
   downloadTrack: (request: unknown): Promise<void> =>
@@ -74,12 +84,10 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADER_RESOLVE, trackUrl),
   downloadSetDir: (): Promise<string> =>
     ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_SET_DIR),
-  onDownloadProgress: (callback: (progress: unknown) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.DOWNLOAD_PROGRESS, (_event, progress) => callback(progress));
-  },
-  onDownloadComplete: (callback: (result: unknown) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.DOWNLOAD_COMPLETE, (_event, result) => callback(result));
-  },
+  onDownloadProgress: (callback: (progress: unknown) => void): Unsubscribe =>
+    subscribe<unknown>(IPC_CHANNELS.DOWNLOAD_PROGRESS, callback),
+  onDownloadComplete: (callback: (result: unknown) => void): Unsubscribe =>
+    subscribe<unknown>(IPC_CHANNELS.DOWNLOAD_COMPLETE, callback),
 
   // Track info from injected script
   sendTrackInfo: (info: unknown): void => {
@@ -118,23 +126,20 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_PLAYLIST, playlistUrl, pageToken || ''),
 
   // Sidebar
-  onSidebarToggle: (callback: () => void) => {
-    ipcRenderer.on(IPC_CHANNELS.SIDEBAR_TOGGLE, () => callback());
-  },
+  onSidebarToggle: (callback: () => void): Unsubscribe =>
+    subscribe<void>(IPC_CHANNELS.SIDEBAR_TOGGLE, () => callback()),
   sidebarNavigate: (url: string): void => {
     ipcRenderer.send(IPC_CHANNELS.SIDEBAR_NAVIGATE, url);
   },
 
   // Updater
   updaterCheck: (): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.UPDATER_CHECK),
-  onUpdaterStatus: (callback: (status: unknown) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.UPDATER_STATUS, (_event, status) => callback(status));
-  },
+  onUpdaterStatus: (callback: (status: unknown) => void): Unsubscribe =>
+    subscribe<unknown>(IPC_CHANNELS.UPDATER_STATUS, callback),
   updaterDownload: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.UPDATER_DOWNLOAD),
   updaterInstall: (): void => ipcRenderer.send(IPC_CHANNELS.UPDATER_INSTALL),
-  onUpdaterProgress: (callback: (progress: { percent: number }) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.UPDATER_PROGRESS, (_event, progress) => callback(progress));
-  },
+  onUpdaterProgress: (callback: (progress: { percent: number }) => void): Unsubscribe =>
+    subscribe<{ percent: number }>(IPC_CHANNELS.UPDATER_PROGRESS, callback),
 
   // Player extras
   notifyTrack: (info: { title: string; artist: string; artwork?: string }): void =>
@@ -160,9 +165,8 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_QUEUE_PAUSE),
   downloadQueueResume: (): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_QUEUE_RESUME),
-  onDownloadQueueState: (callback: (state: unknown) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.DOWNLOAD_QUEUE_STATE, (_event, state) => callback(state));
-  },
+  onDownloadQueueState: (callback: (state: unknown) => void): Unsubscribe =>
+    subscribe<unknown>(IPC_CHANNELS.DOWNLOAD_QUEUE_STATE, callback),
 
   // Download liked tracks
   downloadLiked: (): Promise<void> =>
@@ -183,9 +187,8 @@ const api = {
   // Mini-player
   miniPlayerToggle: (): void =>
     ipcRenderer.send(IPC_CHANNELS.MINI_PLAYER_TOGGLE),
-  onMiniPlayerUpdate: (callback: (info: unknown) => void) => {
-    ipcRenderer.on(IPC_CHANNELS.MINI_PLAYER_UPDATE, (_event, info) => callback(info));
-  },
+  onMiniPlayerUpdate: (callback: (info: unknown) => void): Unsubscribe =>
+    subscribe<unknown>(IPC_CHANNELS.MINI_PLAYER_UPDATE, callback),
 };
 
 contextBridge.exposeInMainWorld('sixteenCloud', api);

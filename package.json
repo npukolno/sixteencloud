@@ -6,9 +6,10 @@
   "homepage": "https://ocb2016.me",
   "main": "dist/main/main.js",
   "scripts": {
-    "build": "node scripts/clean.mjs && node ./node_modules/typescript/bin/tsc && node scripts/build-preload.mjs && node scripts/build-pulse-shim.mjs",
-    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
+    "build": "node scripts/clean.mjs && node ./node_modules/typescript/bin/tsc && node scripts/build-preload.mjs && node scripts/build-renderer.mjs && node scripts/build-pulse-shim.mjs",
+    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit && node ./node_modules/typescript/bin/tsc --noEmit -p tsconfig.renderer.json",
     "test": "npm run build && node --test test/**/*.test.mjs",
+    "lint": "eslint .",
     "start": "npm run build && electron .",
     "dev": "npm run build && electron .",
     "generate-icons": "node scripts/generate-icons.js",
@@ -22,14 +23,18 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/archiver": "^7.0.0",
     "cross-env": "^10.1.0",
     "electron": "^44.9.3",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
+    "eslint": "^9.39.5",
+    "globals": "^16.5.0",
     "png-to-ico": "^2.1.8",
     "sharp": "^0.35.5",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.73.0"
   },
   "dependencies": {
     "archiver": "^7.0.1",

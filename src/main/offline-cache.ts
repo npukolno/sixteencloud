@@ -7,6 +7,7 @@ import { logInfo, logWarn } from './logger';
 import { assertMainRenderer, getStore, resolveTrackStream, streamResponseToFile } from './ipc';
 import { isAllowedMediaUrl, isTrustedSoundCloudUrl } from '../shared/security';
 import type { TrackInfo } from '../shared/types';
+import { planEviction } from './offline-cache-policy';
 
 interface CachedTrack {
   trackId: string;
@@ -49,22 +50,13 @@ function enforceSizeLimit(): void {
   const store = getStore();
   if (!store) return;
   const maxBytes = ((store.get('offlineCache.maxSizeMB') as number) || 500) * 1024 * 1024;
-  let tracks = [...getTracksFromStore()];
-
-  // Sort by cachedAt ascending (oldest first)
-  tracks.sort((a, b) => new Date(a.cachedAt).getTime() - new Date(b.cachedAt).getTime());
-
-  let total = tracks.reduce((sum, t) => sum + (t.fileSize || 0), 0);
-
-  while (total > maxBytes && tracks.length > 0) {
-    const oldest = tracks.shift()!;
-    const filePath = getCachedFilePath(oldest.trackId);
-    try { fs.unlinkSync(filePath); } catch { /* file may not exist */ }
-    total -= oldest.fileSize || 0;
-    logInfo(`[OfflineCache] LRU evicted: ${oldest.title}`);
+  const { keep, evict } = planEviction(getTracksFromStore(), maxBytes);
+  if (evict.length === 0) return;
+  for (const oldest of evict) {
+    try { fs.unlinkSync(getCachedFilePath(oldest.trackId)); } catch { /* file may not exist */ }
+    logInfo(`[OfflineCache] Evicted (oldest first): ${oldest.title}`);
   }
-
-  store.set('offlineCache.tracks', tracks);
+  store.set('offlineCache.tracks', keep);
 }
 
 interface OfflineCacheRequest {

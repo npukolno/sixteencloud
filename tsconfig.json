@@ -15,5 +15,5 @@
     "sourceMap": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "release"]
+  "exclude": ["node_modules", "dist", "release", "src/renderer/mini-player", "src/renderer/page"]
 }

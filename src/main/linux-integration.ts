@@ -9,6 +9,7 @@ import { APP_NAME, IPC_CHANNELS } from '../shared/constants';
 import { TrackInfo } from '../shared/types';
 import { logInfo, logWarn } from './logger';
 import { isAllowedMediaUrl, isTrustedSoundCloudUrl } from '../shared/security';
+import { clickScript, pauseScript, playScript } from '../shared/sc-selectors';
 import { readResponseBuffer, getStore } from './ipc';
 
 type MprisPlaybackStatus = 'Playing' | 'Paused' | 'Stopped';
@@ -457,34 +458,34 @@ function setupMpris(win: BrowserWindow): void {
   mprisPlayer.on('quit', () => app.quit());
 
   mprisPlayer.on('playpause', () => {
-    executePlayerScript(win, `document.querySelector('.playControl')?.click();`, 'playpause');
+    executePlayerScript(win, clickScript('PLAY'), 'playpause');
   });
   mprisPlayer.on('play', () => {
     executePlayerScript(
       win,
-      `var pc=document.querySelector('.playControl'); if (pc && !pc.classList.contains('playing')) pc.click();`,
+      playScript(),
       'play'
     );
   });
   mprisPlayer.on('pause', () => {
     executePlayerScript(
       win,
-      `var pc=document.querySelector('.playControl'); if (pc && pc.classList.contains('playing')) pc.click();`,
+      pauseScript(),
       'pause'
     );
   });
   mprisPlayer.on('stop', () => {
     executePlayerScript(
       win,
-      `var pc=document.querySelector('.playControl'); if (pc && pc.classList.contains('playing')) pc.click();`,
+      pauseScript(),
       'stop'
     );
   });
   mprisPlayer.on('next', () => {
-    executePlayerScript(win, `document.querySelector('.skipControl__next')?.click();`, 'next');
+    executePlayerScript(win, clickScript('NEXT'), 'next');
   });
   mprisPlayer.on('previous', () => {
-    executePlayerScript(win, `document.querySelector('.skipControl__previous')?.click();`, 'previous');
+    executePlayerScript(win, clickScript('PREV'), 'previous');
   });
 
   logInfo('[Linux] MPRIS service is active on D-Bus: org.mpris.MediaPlayer2.sixteencloud');

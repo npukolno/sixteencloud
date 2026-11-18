@@ -58,7 +58,7 @@ export function cleanGeniusLyrics(raw: string): string {
   // Remove Genius page title: "Song Title Lyrics[...]" or "Song Title LyricsText"
   lyrics = lyrics.replace(/^[^\n]*Lyrics\s*\[[^\]]*\]\s*/i, '');
   lyrics = lyrics.replace(/^[^\n]*Lyrics(?=\s*[\r\n])/i, '');
-  lyrics = lyrics.replace(/^[^\n]*Lyrics(?=[A-ZА-ЯЁ\[])/i, '');
+  lyrics = lyrics.replace(/^[^\n]*Lyrics(?=[A-ZА-ЯЁ[])/i, '');
   // Remove Genius localized header markers like "[Текст песни «Title»]" / "[Paroles de «Title»]"
   lyrics = lyrics.replace(/^\s*\[(?:Текст песни|Paroles de|Letra de|Songtext zu|Testo di|Lirik dari)[^\]]*\]\s*/i, '');
   // Remove trailing "Embed" or number lines

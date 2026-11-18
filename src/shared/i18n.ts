@@ -401,6 +401,25 @@ const en: Record<string, string> = {
 
   // Mini-Player
   'tray.mini_player': 'Mini Player',
+  'mini.title': 'Mini player',
+  'mini.nothing_playing': 'Nothing playing',
+  'mini.start_hint': 'Start a track in SixteenCloud',
+  'mini.close': 'Close',
+  'mini.hide': 'Hide',
+  'mini.open_app': 'Open SixteenCloud',
+  'mini.open_track': 'Open track page',
+  'mini.prev': 'Previous track',
+  'mini.next': 'Next track',
+  'mini.play': 'Play',
+  'mini.pause': 'Pause',
+  'mini.play_pause': 'Play or pause',
+  'mini.mute': 'Mute',
+  'mini.unmute': 'Unmute',
+  'mini.sound': 'Sound',
+  'mini.volume': 'Volume',
+  'mini.like': 'Like',
+  'mini.unlike': 'Unlike',
+  'mini.lyrics': 'Lyrics',
 
   // Offline cache
   'offline.title': 'Offline Cache',
@@ -817,6 +836,25 @@ const ru: Record<string, string> = {
 
   // Mini-Player
   'tray.mini_player': 'Мини-плеер',
+  'mini.title': 'Мини-плеер',
+  'mini.nothing_playing': 'Ничего не играет',
+  'mini.start_hint': 'Включи трек в SixteenCloud',
+  'mini.close': 'Закрыть',
+  'mini.hide': 'Скрыть',
+  'mini.open_app': 'Открыть SixteenCloud',
+  'mini.open_track': 'Открыть страницу трека',
+  'mini.prev': 'Предыдущий трек',
+  'mini.next': 'Следующий трек',
+  'mini.play': 'Играть',
+  'mini.pause': 'Пауза',
+  'mini.play_pause': 'Играть или пауза',
+  'mini.mute': 'Выключить звук',
+  'mini.unmute': 'Включить звук',
+  'mini.sound': 'Звук',
+  'mini.volume': 'Громкость',
+  'mini.like': 'Нравится',
+  'mini.unlike': 'Убрать из понравившегося',
+  'mini.lyrics': 'Текст песни',
 
   // Offline cache
   'offline.title': 'Оффлайн кэш',
@@ -850,6 +888,16 @@ export function t(key: string, params?: Record<string, string>): string {
     }
   }
   return text;
+}
+
+/** Every key of a dictionary (used by the en/ru parity test). */
+export function getTranslationKeys(lang: Language): string[] {
+  return Object.keys(dictionaries[lang]);
+}
+
+/** Raw dictionary string, without English fallback (used by tests). */
+export function getRawTranslation(lang: Language, key: string): string | undefined {
+  return dictionaries[lang][key];
 }
 
 export function getScriptTranslations(keys: string[]): Record<string, string> {

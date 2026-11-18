@@ -2,6 +2,7 @@ import { Tray, Menu, BrowserWindow, app, nativeImage, NativeImage } from 'electr
 import path from 'path';
 import { APP_NAME } from '../shared/constants';
 import { t } from '../shared/i18n';
+import { clickScript } from '../shared/sc-selectors';
 
 let tray: Tray | null = null;
 let _toggleMiniPlayer: (() => void) | null = null;
@@ -47,25 +48,19 @@ export function createTray(mainWindow: BrowserWindow): Tray {
     {
       label: t('tray.play_pause'),
       click: () => {
-        mainWindow.webContents.executeJavaScript(`
-          document.querySelector('.playControl')?.click();
-        `);
+        mainWindow.webContents.executeJavaScript(clickScript('PLAY')).catch(() => {});
       },
     },
     {
       label: t('tray.prev'),
       click: () => {
-        mainWindow.webContents.executeJavaScript(`
-          document.querySelector('.skipControl__previous')?.click();
-        `);
+        mainWindow.webContents.executeJavaScript(clickScript('PREV')).catch(() => {});
       },
     },
     {
       label: t('tray.next'),
       click: () => {
-        mainWindow.webContents.executeJavaScript(`
-          document.querySelector('.skipControl__next')?.click();
-        `);
+        mainWindow.webContents.executeJavaScript(clickScript('NEXT')).catch(() => {});
       },
     },
   ];

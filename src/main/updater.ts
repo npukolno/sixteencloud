@@ -44,6 +44,10 @@ function injectUpdateBanner(): void {
   win.webContents.executeJavaScript(`
     (function() {
       if (document.getElementById('sc-update-banner') || !document.body) return;
+      // SoundCloud's SPA can drop the banner; release the listeners an earlier
+      // injection left behind before subscribing again.
+      (window.__scUpdateBannerUnsubs || []).forEach(function(off) { try { off(); } catch (e) {} });
+      window.__scUpdateBannerUnsubs = [];
       try { if (sessionStorage.getItem('sc-update-dismissed')) return; } catch (e) {}
       var _tr = ${_tr};
       function _t(k, p) { var s = _tr[k] || k; if (p) { for (var pk in p) s = s.replace('{' + pk + '}', p[pk]); } return s; }
@@ -69,6 +73,8 @@ function injectUpdateBanner(): void {
       dismissBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
       dismissBtn.onclick = function() {
         banner.remove();
+        (window.__scUpdateBannerUnsubs || []).forEach(function(off) { try { off(); } catch (e) {} });
+        window.__scUpdateBannerUnsubs = [];
         try { sessionStorage.setItem('sc-update-dismissed', '1'); } catch (e) {}
       };
       btnWrap.appendChild(progressBar);
@@ -101,7 +107,8 @@ function injectUpdateBanner(): void {
         });
       };
 
-      api.onUpdaterProgress(function(p) {
+      var track = function(off) { if (typeof off === 'function') window.__scUpdateBannerUnsubs.push(off); };
+      track(api.onUpdaterProgress(function(p) {
         var pct = Math.round(p.percent);
         textSpan.textContent = _t('updater.downloading', {percent: pct});
         progressBar.style.display = 'block';
@@ -109,11 +116,11 @@ function injectUpdateBanner(): void {
         updateBtn.style.opacity = '0.6';
         var fill = document.getElementById('sc-update-progress-fill');
         if (fill) fill.style.width = pct + '%';
-      });
+      }));
 
-      api.onUpdaterStatus(function(status) {
+      track(api.onUpdaterStatus(function(status) {
         if (status && status.downloaded) showDownloaded();
-      });
+      }));
 
       if (${downloaded ? 'true' : 'false'}) showDownloaded();
     })();
