@@ -53,6 +53,7 @@ export function getLyricsOverlayScript(): string {
     'lyrics.searching', 'lyrics.not_found', 'lyrics.fetch_failed',
     'lyrics.search_versions', 'lyrics.use_this', 'lyrics.reset_choice', 'lyrics.no_versions',
     'lyrics.synced', 'lyrics.plain', 'lyrics.query_placeholder', 'lyrics.chosen',
+    'lyrics.fs_version', 'lyrics.fs_version_toast', 'lyrics.fs_offset', 'common.close',
   ]));
   return `
     (function() {
@@ -61,7 +62,7 @@ export function getLyricsOverlayScript(): string {
       panel.dataset.initialized = 'true';
 
       var _tr = ${_tr};
-      function _t(k) { return _tr[k] || k; }
+      function _t(k, p) { var s = _tr[k] || k; if (p) for (var x in p) s = s.replace('{' + x + '}', p[x]); return s; }
 
       var api = window.sixteenCloud;
       if (!api) return;
@@ -357,6 +358,8 @@ export function getLyricsOverlayScript(): string {
       function updateOffsetLabel() {
         var v = offsetMs / 1000;
         offVal.textContent = (v > 0 ? '+' : '') + v.toFixed(1) + 's';
+        var fsOff = fsEl && fsEl.querySelector('.sc-fs-off-val');
+        if (fsOff) fsOff.textContent = offVal.textContent;
       }
       var offSaveTimer = null;
       function changeOffset(delta, absolute) {
@@ -450,12 +453,23 @@ export function getLyricsOverlayScript(): string {
           '@keyframes scFsIn{from{opacity:0}to{opacity:1}}' +
           '#sc-lyrics-fs .sc-fs-bg{position:absolute;inset:-60px;background-size:cover;background-position:center;filter:blur(60px) saturate(1.5) brightness(.5);transform:scale(1.15);transition:background-image .6s}' +
           '#sc-lyrics-fs .sc-fs-shade{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(0,0,0,.05),rgba(0,0,0,.55))}' +
-          '#sc-lyrics-fs .sc-fs-head{position:absolute;left:36px;top:24px;right:90px;z-index:2;text-shadow:0 2px 12px rgba(0,0,0,.5)}' +
+          '#sc-lyrics-fs .sc-fs-head{position:absolute;left:36px;top:24px;right:330px;z-index:2;display:flex;align-items:center;gap:14px;text-shadow:0 2px 12px rgba(0,0,0,.5)}' +
+          '#sc-lyrics-fs .sc-fs-cover{flex:0 0 52px;width:52px;height:52px;border-radius:10px;object-fit:cover;box-shadow:0 6px 20px rgba(0,0,0,.45);background:rgba(255,255,255,.08)}' +
+          '#sc-lyrics-fs .sc-fs-cover[hidden]{display:none}' +
+          '#sc-lyrics-fs .sc-fs-meta{min-width:0}' +
           '#sc-lyrics-fs .sc-fs-title{font-size:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+          '#sc-lyrics-fs .sc-fs-tools{position:absolute;right:76px;top:21px;z-index:3;display:flex;align-items:center;gap:4px;padding:3px;border-radius:19px;background:rgba(255,255,255,.1)}' +
+          '#sc-lyrics-fs .sc-fs-tool{height:30px;min-width:30px;padding:0 10px;border:0;border-radius:15px;background:transparent;color:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer}' +
+          '#sc-lyrics-fs .sc-fs-tool:hover{background:rgba(255,255,255,.16)}' +
+          '#sc-lyrics-fs .sc-fs-tool:disabled{opacity:.4;cursor:default;background:transparent}' +
+          '#sc-lyrics-fs .sc-fs-off-val{min-width:44px;text-align:center;font-size:12px;opacity:.8;font-variant-numeric:tabular-nums}' +
+          '#sc-lyrics-fs .sc-fs-sep{width:1px;height:16px;background:rgba(255,255,255,.2);margin:0 2px}' +
           '#sc-lyrics-fs .sc-fs-artist{font-size:14px;opacity:.7;margin-top:2px}' +
           '#sc-lyrics-fs .sc-fs-close{position:absolute;right:24px;top:20px;z-index:3;width:38px;height:38px;border-radius:50%;border:0;background:rgba(255,255,255,.14);color:#fff;font-size:20px;cursor:pointer}' +
           '#sc-lyrics-fs .sc-fs-close:hover{background:rgba(255,255,255,.26)}' +
-          '#sc-lyrics-fs .sc-fs-body{position:absolute;inset:0;overflow-y:auto;padding:30vh 8vw;text-align:center;scrollbar-width:none;z-index:1}' +
+          '#sc-lyrics-fs .sc-fs-body{position:absolute;inset:0;overflow-y:auto;padding:30vh 8vw;text-align:center;scrollbar-width:none;z-index:1;' +
+            '-webkit-mask-image:linear-gradient(to bottom,transparent 0,transparent 70px,#000 26%,#000 76%,transparent 100%);' +
+            'mask-image:linear-gradient(to bottom,transparent 0,transparent 70px,#000 26%,#000 76%,transparent 100%)}' +
           '#sc-lyrics-fs .sc-fs-body::-webkit-scrollbar{display:none}' +
           '#sc-lyrics-fs .sc-fs-line{font-size:clamp(24px,3.6vw,48px);font-weight:800;line-height:1.25;margin:.55em 0;color:rgba(255,255,255,.3);cursor:pointer;transition:color .35s,transform .35s,filter .35s;transform:scale(.94);filter:blur(1.2px)}' +
           '#sc-lyrics-fs .sc-fs-line:hover{color:rgba(255,255,255,.55)}' +
@@ -473,23 +487,99 @@ export function getLyricsOverlayScript(): string {
       }
       injectLyricsStyles();
 
+      // "Another version" in full screen: walk through the candidate list
+      // (same sources as the panel's picker) and remember the choice.
+      var versions = { key: '', items: null, index: -1, loading: false };
+      function lyricsSig(r) { return r ? String(r.syncedLyrics || r.lyrics || '').slice(0, 400) : ''; }
+      function nextVersion(btn) {
+        if (!curPrefKey || versions.loading) return;
+        if (versions.key !== curPrefKey || !versions.items) {
+          versions = { key: curPrefKey, items: null, index: -1, loading: true };
+          btn.disabled = true;
+          var forKey = curPrefKey;
+          api.lyricsCandidates(curArtist, curTitle, curDur).then(function(items) {
+            if (forKey !== curPrefKey) return;
+            versions.items = Array.isArray(items) ? items.filter(function(c) { return c && c.lyrics; }) : [];
+            var cur = lyricsSig(curResult);
+            versions.index = versions.items.findIndex(function(c) { return lyricsSig(c) === cur; });
+          }).catch(function() {
+            versions.items = [];
+          }).then(function() {
+            versions.loading = false;
+            btn.disabled = false;
+            if (forKey === curPrefKey) stepVersion();
+          });
+          return;
+        }
+        stepVersion();
+      }
+      function stepVersion() {
+        var items = versions.items || [];
+        if (!items.length) { if (window.__scToast) window.__scToast(_t('lyrics.no_versions')); return; }
+        var cur = lyricsSig(curResult);
+        var next = versions.index;
+        for (var i = 1; i <= items.length; i++) {
+          var k = (versions.index + i) % items.length;
+          if (lyricsSig(items[k]) !== cur || items.length === 1) { next = k; break; }
+        }
+        if (next < 0) next = 0;
+        versions.index = next;
+        var c = items[next];
+        var chosen = { lyrics: c.lyrics, syncedLyrics: c.syncedLyrics, source: c.source };
+        fetchSeq++;
+        applyResult(chosen);
+        if (typeof api.lyricsPref === 'function') api.lyricsPref('setChoice', curPrefKey, chosen).catch(function() {});
+        if (window.__scToast) {
+          window.__scToast(_t('lyrics.fs_version_toast', {
+            n: String(next + 1), total: String(items.length),
+            source: String(c.source || '') + (c.synced ? ' \u00b7 ' + _t('lyrics.synced') : '')
+          }));
+        }
+      }
+
       function ensureFs() {
         if (fsEl) return fsEl;
         fsEl = document.createElement('div');
         fsEl.id = 'sc-lyrics-fs';
         fsEl.setAttribute('role', 'dialog');
         fsEl.setAttribute('aria-modal', 'true');
-        fsEl.innerHTML = '<div class="sc-fs-bg"></div><div class="sc-fs-shade"></div><button class="sc-fs-close" aria-label="Close">&#10005;</button>' +
-          '<div class="sc-fs-head"><div class="sc-fs-title"></div><div class="sc-fs-artist"></div></div><div class="sc-fs-body"></div>';
+        fsEl.innerHTML = '<div class="sc-fs-bg"></div><div class="sc-fs-shade"></div>' +
+          '<button class="sc-fs-close" aria-label="' + esc(_t('common.close')) + '">&#10005;</button>' +
+          '<div class="sc-fs-tools" role="toolbar">' +
+            '<button class="sc-fs-tool" data-fs="off-minus" title="' + esc(_t('lyrics.fs_offset')) + '" aria-label="-0.5s">&minus;0.5</button>' +
+            '<span class="sc-fs-off-val"></span>' +
+            '<button class="sc-fs-tool" data-fs="off-plus" title="' + esc(_t('lyrics.fs_offset')) + '" aria-label="+0.5s">+0.5</button>' +
+            '<span class="sc-fs-sep"></span>' +
+            '<button class="sc-fs-tool" data-fs="version">' + esc(_t('lyrics.fs_version')) + '</button>' +
+          '</div>' +
+          '<div class="sc-fs-head"><img class="sc-fs-cover" alt="" hidden><div class="sc-fs-meta"><div class="sc-fs-title"></div><div class="sc-fs-artist"></div></div></div>' +
+          '<div class="sc-fs-body"></div>';
         document.body.appendChild(fsEl);
         fsEl.querySelector('.sc-fs-close').addEventListener('click', closeFs);
+        fsEl.querySelector('.sc-fs-tools').addEventListener('click', function(e) {
+          var b = e.target.closest ? e.target.closest('.sc-fs-tool') : null;
+          if (!b || b.disabled) return;
+          var what = b.getAttribute('data-fs');
+          if (what === 'off-minus') changeOffset(-500);
+          else if (what === 'off-plus') changeOffset(500);
+          else if (what === 'version') nextVersion(b);
+        });
+        var cover = fsEl.querySelector('.sc-fs-cover');
+        cover.addEventListener('error', function() { cover.hidden = true; });
+        updateOffsetLabel();
         return fsEl;
       }
 
       function fsRender() {
         if (!fsOpen || !fsEl) return;
         var art = typeof window.__scFindArtwork === 'function' ? window.__scFindArtwork() : null;
-        if (art) fsEl.querySelector('.sc-fs-bg').style.backgroundImage = 'url("' + art + '")';
+        var safeArt = art && /^https:\\/\\//i.test(art) ? String(art).replace(/["\\\\()]/g, '') : '';
+        if (safeArt) fsEl.querySelector('.sc-fs-bg').style.backgroundImage = 'url("' + safeArt + '")';
+        var cover = fsEl.querySelector('.sc-fs-cover');
+        if (safeArt && cover.getAttribute('src') !== safeArt) { cover.hidden = false; cover.src = safeArt; }
+        else if (!safeArt) cover.hidden = true;
+        var verBtn = fsEl.querySelector('[data-fs="version"]');
+        if (verBtn) verBtn.disabled = !curPrefKey;
         fsEl.querySelector('.sc-fs-title').textContent = curTitle;
         fsEl.querySelector('.sc-fs-artist').textContent = curArtist;
         var body = fsEl.querySelector('.sc-fs-body');

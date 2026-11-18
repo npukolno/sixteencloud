@@ -357,6 +357,9 @@ const en: Record<string, string> = {
   'lyrics.plain': 'plain',
   'lyrics.query_placeholder': 'Artist and title (optional)',
   'lyrics.chosen': 'Your choice',
+  'lyrics.fs_version': 'Another version',
+  'lyrics.fs_version_toast': 'Lyrics version {n} of {total}: {source}',
+  'lyrics.fs_offset': 'Shift the sync by half a second',
 
   // Themes overlay
   'themes.title': 'Themes',
@@ -814,6 +817,9 @@ const ru: Record<string, string> = {
   'lyrics.plain': 'без тайминга',
   'lyrics.query_placeholder': 'Исполнитель и название (необязательно)',
   'lyrics.chosen': 'Ваш выбор',
+  'lyrics.fs_version': 'Другая версия',
+  'lyrics.fs_version_toast': 'Версия текста {n} из {total}: {source}',
+  'lyrics.fs_offset': 'Сдвинуть синхронизацию на полсекунды',
 
   // Themes overlay
   'themes.title': 'Темы',
