@@ -9,6 +9,9 @@ export const SC = {
   PREV: '.skipControl__previous, .playControls__prev',
   PLAYER_BAR: '.playControls',
   TITLE_LINK: '.playbackSoundBadge__titleLink',
+  /** Slot that holds the cover/title badge inside .playControls__elements. */
+  SOUND_BADGE_SLOT: '.playControls__soundBadge',
+  PLAYER_ELEMENTS: '.playControls__elements',
   ARTIST_LINK: '.playbackSoundBadge__lightLink',
   AVATAR: '.playbackSoundBadge__avatar',
   /** Element whose inline style carries the artwork as a background-image. */

@@ -303,6 +303,7 @@ export const IPC_CHANNELS = {
   OFFLINE_CACHE_LIST: 'offline:list',
   OFFLINE_CACHE_CLEAR: 'offline:clear',
   OFFLINE_CACHE_STATUS: 'offline:status',
+  OFFLINE_CACHE_URL: 'offline:cache-url',
   MINI_PLAYER_TOGGLE: 'mini:toggle',
   MINI_PLAYER_UPDATE: 'mini:update',
 } as const;

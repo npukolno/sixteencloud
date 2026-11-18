@@ -121,6 +121,31 @@ export function validateDownloadRequest(input: unknown): DownloadRequest {
   };
 }
 
+/** "Save the playing track for offline" from the player bar (quick-actions.ts). */
+export interface OfflineQuickRequest {
+  trackUrl: string;
+  trackId: string;
+  title: string;
+  artist: string;
+  artworkUrl: string;
+  duration: number;
+}
+
+export function validateOfflineQuickRequest(input: unknown): OfflineQuickRequest {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid offline request');
+  const raw = input as Record<string, unknown>;
+  const trackUrl = typeof raw.trackUrl === 'string' ? raw.trackUrl : '';
+  if (!trackUrl || trackUrl.length > 2048 || !isTrustedSoundCloudUrl(trackUrl)) throw new Error('Track URL must be an HTTPS SoundCloud URL');
+  // Same id the auto-cache derives: the page path, never the query (?in=...).
+  const trackId = new URL(trackUrl).pathname.replace(/^\/+|\/+$/g, '').slice(0, 256);
+  if (!trackId || trackId.split('/').length < 2) throw new Error('Not a track URL');
+  const text = (value: unknown) => (typeof value === 'string' ? value.trim().slice(0, 500) : '');
+  const artworkUrl = typeof raw.artworkUrl === 'string' && raw.artworkUrl && isAllowedMediaUrl(raw.artworkUrl) ? raw.artworkUrl : '';
+  const duration = typeof raw.duration === 'number' && Number.isFinite(raw.duration) && raw.duration >= 0 && raw.duration < 86400 * 2
+    ? raw.duration : 0;
+  return { trackUrl, trackId, title: text(raw.title), artist: text(raw.artist), artworkUrl, duration };
+}
+
 /** True when the bytes are an HLS playlist rather than audio. */
 export function isHlsPlaylistBuffer(buf: Uint8Array): boolean {
   return buf.length > 6 && Buffer.from(buf.subarray(0, 7)).toString('latin1') === '#EXTM3U';

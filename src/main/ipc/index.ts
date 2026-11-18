@@ -6,6 +6,7 @@ import { setupScrobbleIPC } from './scrobble';
 import { setupDownloaderIPC } from './downloader';
 import { setupHistoryIPC } from './history';
 import { setupLyricsIPC } from './lyrics';
+import { setupQuickActionsIPC } from './quick-actions';
 
 export { getStore, getEncryptionKey, getSecret, setSecret } from './store';
 export { assertMainRenderer, safeSend } from './guard';
@@ -22,4 +23,5 @@ export function setupIPC(mainWindow: BrowserWindow): void {
   setupDownloaderIPC(mainWindow);
   setupHistoryIPC(mainWindow);
   setupLyricsIPC(mainWindow);
+  setupQuickActionsIPC(mainWindow);
 }

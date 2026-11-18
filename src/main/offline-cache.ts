@@ -85,7 +85,7 @@ function isValidCacheRequest(data: OfflineCacheRequest): boolean {
     (!data.artworkUrl || isAllowedMediaUrl(data.artworkUrl));
 }
 
-async function cacheTrack(data: OfflineCacheRequest): Promise<{ success: boolean; message?: string; error?: string }> {
+export async function cacheTrack(data: OfflineCacheRequest): Promise<{ success: boolean; message?: string; error?: string }> {
   const store = getStore();
   if (!store) throw new Error('Store not initialized');
   if (!isValidCacheRequest(data)) throw new Error('Invalid offline cache request');
