@@ -134,16 +134,6 @@ export function getSettingsOverlayHTML(): string {
             <div class="sc-custom-dropdown-item" data-value="spectrogram">${t('settings.viz_spectrogram')}</div>
           </div>
         </div>
-        <div class="sc-overlay-toggle" style="margin-top: 10px;">
-          <div>
-            <span class="sc-overlay-toggle-label">${t('settings.viz_lyrics_ring')}</span>
-            <div style="font-size:11px;opacity:.6;margin-top:2px;">${t('settings.viz_lyrics_ring_desc')}</div>
-          </div>
-          <label class="sc-overlay-switch">
-            <input type="checkbox" id="sc-set-viz-lyrics-ring" checked>
-            <span class="sc-overlay-switch-slider"></span>
-          </label>
-        </div>
       </div>
 
       <div class="sc-overlay-toggle" style="margin-top: 16px;">
@@ -264,7 +254,6 @@ export function getSettingsOverlayScript(): string {
       const autoUpdate = panel.querySelector('#sc-set-autoupdate');
       const batterySaver = panel.querySelector('#sc-set-battery-saver');
       const ambient = panel.querySelector('#sc-set-ambient');
-      const lyricsRing = panel.querySelector('#sc-set-viz-lyrics-ring');
       const checkUpdateBtn = panel.querySelector('#sc-set-check-update');
       const updateStatus = panel.querySelector('#sc-set-update-status');
 
@@ -321,7 +310,6 @@ export function getSettingsOverlayScript(): string {
       // Visualizer is on by default; only an explicit false disables it.
       api.storeGet('visualizer').then(function(v) {
         visualizer.checked = !v || v.enabled !== false;
-        lyricsRing.checked = !v || v.lyricsRing !== false;
         const vizType = (v && v.type) || 'side';
         currentVisualizerType = vizType;
 
@@ -343,15 +331,6 @@ export function getSettingsOverlayScript(): string {
           state.enabled = visualizer.checked;
           api.storeSet('visualizer', state);
           if (typeof window.__scVizSetEnabled === 'function') window.__scVizSetEnabled(state.enabled);
-        });
-      });
-
-      lyricsRing.addEventListener('change', function() {
-        api.storeGet('visualizer').then(function(v) {
-          var state = Object.assign({ enabled: true, type: 'side', version: 2 }, v || {});
-          state.lyricsRing = lyricsRing.checked;
-          api.storeSet('visualizer', state);
-          if (typeof window.__scVizSetLyricsRing === 'function') window.__scVizSetLyricsRing(state.lyricsRing);
         });
       });
 

@@ -454,9 +454,8 @@ export function getLyricsOverlayScript(): string {
           '#sc-lyrics-fs .sc-fs-bg{position:absolute;inset:-60px;background-size:cover;background-position:center;filter:blur(60px) saturate(1.5) brightness(.5);transform:scale(1.15);transition:background-image .6s}' +
           '#sc-lyrics-fs .sc-fs-shade{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(0,0,0,.05),rgba(0,0,0,.55))}' +
           '#sc-lyrics-fs .sc-fs-head{position:absolute;left:36px;top:24px;right:330px;z-index:2;display:flex;align-items:center;gap:14px;text-shadow:0 2px 12px rgba(0,0,0,.5)}' +
-          // Not .sc-fs-cover: the visualizer's lyrics ring owns that class for its round centre cover.
           '#sc-lyrics-fs .sc-fs-headcover{flex:0 0 52px;width:52px;height:52px;border-radius:10px;object-fit:cover;box-shadow:0 6px 20px rgba(0,0,0,.45);background:rgba(255,255,255,.08)}' +
-          '#sc-lyrics-fs .sc-fs-headcover[hidden],#sc-lyrics-fs.sc-fs-ring-on .sc-fs-headcover{display:none}' +
+          '#sc-lyrics-fs .sc-fs-headcover[hidden]{display:none}' +
           '#sc-lyrics-fs .sc-fs-meta{min-width:0}' +
           '#sc-lyrics-fs .sc-fs-title{font-size:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
           '#sc-lyrics-fs .sc-fs-tools{position:absolute;right:76px;top:21px;z-index:3;display:flex;align-items:center;gap:4px;padding:3px;border-radius:19px;background:rgba(255,255,255,.1)}' +

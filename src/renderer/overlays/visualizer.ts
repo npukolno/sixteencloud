@@ -1111,134 +1111,6 @@ export function getVisualizerScript(): string {
         cv.style.opacity = '0.8';
       }
 
-      // ---- Full-screen lyrics: cover with a circular spectrum, pulsing backdrop ----
-      var lyricsRing = true;
-      var ringSmooth = null;
-      var ringParts = null;
-      var ringArt = '';
-      var ringPulseKey = '';
-      var RING_BARS = 64;
-      function lyricsFs() {
-        var fs = document.getElementById('sc-lyrics-fs');
-        return fs && fs.classList.contains('open') ? fs : null;
-      }
-      function ensureRingParts(fs) {
-        if (ringParts && ringParts.fs === fs && ringParts.wrap.isConnected) return ringParts;
-        if (!document.getElementById('sc-fs-ring-style')) {
-          var st = document.createElement('style');
-          st.id = 'sc-fs-ring-style';
-          st.textContent =
-            '#sc-lyrics-fs .sc-fs-pulse{position:absolute;inset:0;opacity:0;pointer-events:none;will-change:opacity}' +
-            '#sc-lyrics-fs .sc-fs-ringwrap{position:absolute;left:5vw;top:50%;width:min(30vw,48vh);aspect-ratio:1;transform:translateY(-50%);display:none;z-index:1;pointer-events:none}' +
-            '#sc-lyrics-fs .sc-fs-ring{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity .45s ease}' +
-            '#sc-lyrics-fs .sc-fs-cover{position:absolute;inset:21%;border-radius:50%;background:#222 center/cover no-repeat;box-shadow:0 18px 50px rgba(0,0,0,.55)}' +
-            '#sc-lyrics-fs.sc-fs-ring-on .sc-fs-ringwrap{display:block}' +
-            '#sc-lyrics-fs.sc-fs-ring-on .sc-fs-body{padding-left:calc(9vw + min(30vw,48vh));padding-right:5vw}';
-          (document.head || document.documentElement).appendChild(st);
-        }
-        var pulse = document.createElement('div');
-        pulse.className = 'sc-fs-pulse';
-        var shade = fs.querySelector('.sc-fs-shade');
-        if (shade && shade.nextSibling) fs.insertBefore(pulse, shade.nextSibling); else fs.appendChild(pulse);
-        var wrap = document.createElement('div');
-        wrap.className = 'sc-fs-ringwrap';
-        wrap.innerHTML = '<canvas class="sc-fs-ring"></canvas><div class="sc-fs-cover"></div>';
-        fs.appendChild(wrap);
-        ringParts = { fs: fs, pulse: pulse, wrap: wrap, canvas: wrap.querySelector('canvas'), cover: wrap.querySelector('.sc-fs-cover') };
-        ringArt = '';
-        ringPulseKey = '';
-        return ringParts;
-      }
-      // Layout class: the cover column appears only with room for it, and only
-      // while the ring is allowed at all (visualizer on, setting on).
-      function syncRingLayout() {
-        var fs = document.getElementById('sc-lyrics-fs');
-        if (!fs) return;
-        var want = lyricsRing && on() && fs.clientWidth >= 900;
-        fs.classList.toggle('sc-fs-ring-on', !!want);
-        if (!want && ringParts && ringParts.fs === fs) ringParts.pulse.style.opacity = '0';
-      }
-      function hideRing() {
-        if (ringParts) {
-          ringParts.canvas.style.opacity = '0';
-          ringParts.pulse.style.opacity = '0';
-        }
-      }
-      function drawLyricsRing(now) {
-        var fs = lyricsFs();
-        if (!fs) return;
-        var parts = ensureRingParts(fs);
-        syncRingLayout();
-        easePalette();
-        var bass = framePulse(now);
-
-        var key = rgbCss(current[0], 1);
-        if (key !== ringPulseKey) {
-          ringPulseKey = key;
-          parts.pulse.style.background = 'radial-gradient(circle at 22% 50%,' + rgbCss(current[0], 0.5) + ',' + rgbCss(current[1], 0.12) + ' 45%,transparent 70%)';
-        }
-        parts.pulse.style.opacity = String(clamp(0.15 + bass * 0.75, 0, 0.9).toFixed(3));
-
-        if (!fs.classList.contains('sc-fs-ring-on')) return;
-
-        var art = findArtwork() || '';
-        if (art && art !== ringArt) {
-          ringArt = art;
-          parts.cover.style.backgroundImage = 'url("' + art.replace(/"/g, '%22') + '")';
-        }
-
-        var cv = parts.canvas;
-        var size = Math.round(parts.wrap.clientWidth);
-        if (size < 40) return;
-        var dpr = Math.min(2, window.devicePixelRatio || 1);
-        if (cv.width !== size * dpr) { cv.width = size * dpr; cv.height = size * dpr; }
-        var ctx = cv.getContext('2d');
-        if (!ctx) return;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.clearRect(0, 0, size, size);
-
-        // Half the ring from the spectrum, mirrored, so bass meets at the top.
-        var half = RING_BARS / 2;
-        if (!ringSmooth || ringSmooth.length !== half) ringSmooth = new Float32Array(half);
-        var bins = freq ? freq.length : 0;
-        var usable = Math.max(8, Math.floor(bins * 0.46));
-        for (var i = 0; i < half; i++) {
-          var t = half > 1 ? i / (half - 1) : 0;
-          var v = 0;
-          if (bins) v = Math.pow(freq[Math.min(bins - 1, Math.floor(Math.pow(t, 1.55) * usable))] / 255, 1.25);
-          var idle = 0.04 * (0.6 + 0.4 * Math.sin(now / 700 + i * 0.5));
-          if (v < idle) v = idle;
-          ringSmooth[i] += (v - ringSmooth[i]) * (v > ringSmooth[i] ? 0.55 : 0.14);
-        }
-
-        var c = size / 2;
-        var inner = size * 0.29 * (1 + bass * 0.025);
-        var reach = size * 0.19;
-        var barW = Math.max(2, (2 * Math.PI * inner / RING_BARS) * 0.55);
-        var spin = now / 24000;
-        ctx.lineCap = 'round';
-        ctx.lineWidth = barW;
-        for (var b = 0; b < RING_BARS; b++) {
-          var m = b < half ? b : RING_BARS - 1 - b;
-          var lv = ringSmooth[m];
-          var ang = -Math.PI / 2 + (b + 0.5) / RING_BARS * Math.PI * 2 + spin;
-          var len = 3 + lv * reach;
-          var cs = Math.cos(ang), sn = Math.sin(ang);
-          ctx.strokeStyle = rgbCss(mix(current[0], current[2], m / Math.max(1, half - 1)), 0.55 + lv * 0.45);
-          ctx.beginPath();
-          ctx.moveTo(c + cs * inner, c + sn * inner);
-          ctx.lineTo(c + cs * (inner + len), c + sn * (inner + len));
-          ctx.stroke();
-        }
-        cv.style.opacity = '1';
-      }
-
-      window.__scVizSetLyricsRing = function(value) {
-        lyricsRing = value !== false;
-        syncRingLayout();
-        if (!lyricsRing) hideRing();
-      };
-
       // Fade the overlay out without destroying it: the next play resumes the
       // same canvas without a reflow flash.
       function hideVisuals() {
@@ -1246,7 +1118,6 @@ export function getVisualizerScript(): string {
         if (waveCanvas) waveCanvas.style.opacity = '0';
         if (specCanvas) specCanvas.style.opacity = '0';
         hideAmbient();
-        hideRing();
         // Wave is gone (pause, disable, mode switch): give the timeline its own
         // orange bar and draggable handle back.
         restoreWaveNative();
@@ -1442,13 +1313,10 @@ export function getVisualizerScript(): string {
         else if (vizType === 'led') drawLed(now);
         else if (vizType === 'spectrogram') drawSpectrogram(now);
 
-        if (lyricsRing) drawLyricsRing(now);
-
         raf = requestAnimationFrame(draw);
       }
 
       function applyEnabled() {
-        syncRingLayout();
         if (!canvas) return;
         canvas.style.opacity = on() ? '1' : '0';
         if (on()) startLoop();
@@ -1483,7 +1351,6 @@ export function getVisualizerScript(): string {
         api.storeGet('visualizer').then(function(state) {
           enabled = !state || state.enabled !== false;
           if (state && state.type) vizType = state.type;
-          lyricsRing = !state || state.lyricsRing !== false;
           applyEnabled();
         }).catch(function() {});
       }

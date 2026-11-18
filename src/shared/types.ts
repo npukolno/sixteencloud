@@ -172,8 +172,6 @@ export interface StoreSchema {
     type: VisualizerType;
     colorScheme: string;
     version?: number;
-    /** Ring spectrum around the cover in full-screen lyrics (default on). */
-    lyricsRing?: boolean;
   };
   sidebar: {
     bookmarks: SidebarBookmark[];

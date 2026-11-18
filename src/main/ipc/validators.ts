@@ -90,6 +90,8 @@ export function validateStoreValue(key: string, value: unknown): void {
   }
   if (key === 'audioFx' && !isAudioFxState(value)) throw new Error('Invalid audio effects state');
   if (key === 'visualizer') {
+    // lyricsRing: removed feature, still present in older configs that the
+    // settings panel copies back on save.
     const state = value as { enabled?: unknown; type?: unknown; lyricsRing?: unknown } | null;
     if (!state || typeof state !== 'object' || Array.isArray(state) || typeof state.enabled !== 'boolean' ||
         !(VISUALIZER_TYPES as readonly unknown[]).includes(state.type) ||
