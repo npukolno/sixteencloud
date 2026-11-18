@@ -52,22 +52,29 @@ SixteenCloud wraps the SoundCloud web player in Electron and adds the parts a mu
 ## Features
 
 - **Ad-free playback** — request filtering plus cosmetic cleanup of promoted content.
-- **Synced lyrics** — LRC from LRCLIB, NetEase and QQ; plain lyrics from Genius, Musixmatch, lyrics.ovh, AZLyrics, ChartLyrics and lyrist. Smarter track matching, a sync-offset slider, an "other versions" picker and a blurred full-screen mode.
-- **Player tools** — skip promoted tracks and 30-second previews, resume where you left off after a restart, playback speed, sleep timer, track-change notifications and ListenBrainz scrobbling.
+- **Synced lyrics** — LRC from LRCLIB, NetEase and QQ; plain lyrics from Genius, Musixmatch, lyrics.ovh, AZLyrics, ChartLyrics and lyrist. Smarter track matching, a sync-offset slider, an "other versions" picker and a blurred full-screen mode with ±0.5 s sync nudges, a version switcher and the cover next to the title.
+- **Player tools** — skip promoted tracks and 30-second previews, resume where you left off after a restart, playback speed, sleep timer, seek steps of 5–30 s, an A–B loop (`Alt+J` / `Alt+L` / `Alt+K`, rebindable), track-change notifications and ListenBrainz scrobbling.
+- **Player bar shortcuts** — Lyrics, Download and Save offline buttons right next to the cover in SoundCloud's own player bar.
 - **Accent from cover art** — the whole interface can take its colour from the playing track.
 - **Search shortcuts** — `/` or Ctrl+K focuses search; recent queries open as a dropdown.
-- **10-band equalizer** — Web Audio graph with presets, per-track persistence.
-- **Audio visualizer** — side bars, centre bars, progress wave, kick-reactive cover glow, oscilloscope, window edge glow, retro LED meter and a spectrogram behind the player; full-screen lyrics get the cover with a circular spectrum. All driven by the real analyser node and coloured from the cover art.
-- **Downloads** — tracks and playlists, HLS-aware, with a queue, progress and history.
+- **10-band equalizer** — presets and custom curves, plus a preamp and a limiter / loudness leveller. It runs on a master bus that every track flows through, so it stays applied across track changes.
+- **Audio visualizer** — side bars, centre bars, progress wave, kick-reactive cover glow, oscilloscope, window edge glow, retro LED meter and a spectrogram behind the player. All driven by the real analyser node and coloured from the cover art.
+- **Downloads** — single tracks, playlists (three tracks at a time, packed into a zip), all your likes and the current play queue. Streamed straight to disk, HLS-aware, tagged with cover art, with a queue, progress and history.
+- **Mini player** — always-on-top window that follows your theme and accent, with like and lyrics buttons.
+- **Feed without reposts** — show, fold or hide reposts in the home feed.
 - **Discord Rich Presence** — current track, artist and artwork.
 - **Linux integration** — tray, MPRIS (`org.mpris.MediaPlayer2.sixteencloud`), media keys, desktop entry, notification controls.
 - **Windows taskbar** — previous / play-pause / next under the window thumbnail and track progress on the taskbar button.
 - **Battery saver** — on battery power the visualizer, blur and animations switch off (can be disabled in Settings).
-- **Side panel that stays out of the way** — the page makes room for it on mid-size windows, tucks it behind an edge handle on narrow ones; `Ctrl+G` hides it.
-- **Bookmarks sidebar** — saved tracks, sets and profiles with quick navigation.
+- **Side panel that stays out of the way** — grouped icons with live status dots (EQ, geo proxy, downloads); the page makes room for it on mid-size windows, tucks it behind an edge handle on narrow ones; `Ctrl+G` hides it.
+- **Titlebar** — back, forward and reload, plus live chips for the sleep timer, the geo proxy and download progress.
+- **Toasts and ambient glow** — short in-app confirmations and a soft glow from the cover colours above the player bar.
+- **Bookmarks sidebar** — saved tracks, sets and profiles with covers, pins, folders, drag to reorder and timecode bookmarks for long mixes.
 - **Themes & accents** — accent color, dark/light, custom CSS.
 - **Geo-unblock** — optional proxy routing for region-locked catalogs.
 - **History** — locally stored listening history with search.
+- **Settings backup** — export or import the whole profile (themes, custom CSS, EQ presets, bookmarks, keybinds, adblock rules) as one JSON file. Tokens are never included.
+- **Tokens in the OS keychain** — the SoundCloud and ListenBrainz tokens are encrypted with the system keyring when one is available.
 - **Auto-update** — Windows and AppImage builds check GitHub Releases (Windows builds are unsigned, so SmartScreen warns before the first run).
 
 ## Install
@@ -76,21 +83,21 @@ Grab the latest asset from [Releases](https://github.com/npukolno/sixteencloud/r
 
 ### Windows
 
-Download **`SixteenCloud.Setup.3.0.3.exe`** and run it. The installer is per-user and does not require administrator rights. If SmartScreen warns about an unsigned publisher, choose **More info → Run anyway**.
+Download **`SixteenCloud.Setup.3.0.4.exe`** and run it. The installer is per-user and does not require administrator rights. If SmartScreen warns about an unsigned publisher, choose **More info → Run anyway**.
 
 ### Linux
 
 | Format | Install |
 | --- | --- |
-| **AppImage** | `chmod +x SixteenCloud.Setup.3.0.3.AppImage && ./SixteenCloud.Setup.3.0.3.AppImage` |
-| **Debian / Ubuntu** | `sudo dpkg -i SixteenCloud.Setup.3.0.3.deb` then `sudo apt -f install` if needed |
-| **Arch / pacman** | `sudo pacman -U SixteenCloud.Setup.3.0.3.pacman` |
+| **AppImage** | `chmod +x SixteenCloud.Setup.3.0.4.AppImage && ./SixteenCloud.Setup.3.0.4.AppImage` |
+| **Debian / Ubuntu** | `sudo dpkg -i SixteenCloud.Setup.3.0.4.deb` then `sudo apt -f install` if needed |
+| **Arch / pacman** | `sudo pacman -U SixteenCloud.Setup.3.0.4.pacman` |
 
 On Wayland, if the window does not appear, launch with `--ozone-platform=wayland` or run under XWayland.
 
 ### macOS
 
-Download **`SixteenCloud.Setup.3.0.3.zip`**, unzip and drag `SixteenCloud.app` to Applications. The build is unsigned and x86_64 only; clear the quarantine flag once:
+Download **`SixteenCloud.Setup.3.0.4.zip`**, unzip and drag `SixteenCloud.app` to Applications. The build is unsigned and x86_64 only; clear the quarantine flag once:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/SixteenCloud.app
@@ -106,7 +113,7 @@ xattr -dr com.apple.quarantine /Applications/SixteenCloud.app
 | Linux pacman | Not auto-installed by the app — update the package manually. |
 | macOS zip | Manual replacement (unsigned builds cannot self-install). |
 
-Updates are read from GitHub Releases of this repository. Older 2.x builds migrate to 3.0.3 through the same release feed.
+Updates are read from GitHub Releases of this repository. Older 2.x builds migrate to 3.0.4 through the same release feed.
 
 ## Build from source
 
@@ -117,6 +124,7 @@ git clone https://github.com/npukolno/sixteencloud.git
 cd sixteencloud
 npm ci
 npm run typecheck
+npm run lint
 npm test
 npm start
 ```
@@ -135,14 +143,17 @@ Code-signing material is supplied through electron-builder environment variables
 
 | Path | Purpose |
 | --- | --- |
-| `src/main/` | Electron main process: windows, tray, IPC, updater, downloads, Linux integration |
+| `src/main/` | Electron main process, one module per concern: window, adblocker, geo-bypass, input, mini-player, overlays, updater, Linux integration |
+| `src/main/ipc/` | IPC handlers: store and secrets, downloader, lyrics, auth, scrobbling, settings backup; pure validators and parsers are unit-tested |
 | `src/preload/` | Sandboxed preload bridges (`preload.ts`, `mini-preload.ts`) |
-| `src/renderer/` | Injected overlay UI (titlebar, sidebar, lyrics, EQ, settings, visualizer) |
+| `src/renderer/overlays/` | Injected overlay UI (titlebar, sidebar, lyrics, EQ, settings, visualizer) |
+| `src/renderer/mini-player/`, `src/renderer/page/` | Mini-player window and page scripts written as TypeScript and bundled with esbuild |
 | `src/shared/` | Types, constants, i18n, user-agent |
 | `native/pulse-sixteencloud.c` | `LD_PRELOAD` shim that brands the PulseAudio stream |
 | `assets/` | Icons, overlay CSS, fonts, installer artwork |
 | `docs/screenshots/` | README screenshots |
-| `scripts/` | Preload/pulse-shim bundling and icon generation |
+| `scripts/` | Preload, renderer and pulse-shim bundling, icon generation |
+| `test/` | `node --test` suites (validators, parsers, i18n parity, audio bus, page script syntax) |
 
 ## License
 
