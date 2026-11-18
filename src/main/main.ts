@@ -18,7 +18,7 @@ import { setupAdblocker, injectAdBlockCSS } from './adblocker';
 import { setupGeoBypass } from './geo-bypass';
 import { setupBatterySaver } from './power';
 import { registerKeybinds, registerMediaKeys, registerNavigation } from './input';
-import { injectMediaSession, injectSpaLoadWatcher } from './media-session';
+import { injectPageScript } from './page-scripts';
 import { applyContentSecurityPolicy } from './csp';
 import { findDeepLink, handleDeepLink, registerProtocolClient } from './deep-link';
 import { installPulseIdentityShim } from './pulse-shim';
@@ -1032,8 +1032,8 @@ function injectOverlayPanels(win: BrowserWindow): void {
 /** Everything injected into the SoundCloud page on each load, in order. */
 function injectPage(win: BrowserWindow, afterInject: () => void): void {
   injectOverlaySystem(win);
-  injectSpaLoadWatcher(win);
-  injectMediaSession(win);
+  injectPageScript(win, 'load-watcher');
+  injectPageScript(win, 'media-session');
   runInPage(win, getTitlebarScript()).catch((e: any) => logWarn('Titlebar inject error:', e?.message));
   // After the overlay scripts that define the hooks it calls.
   setImmediate(afterInject);
