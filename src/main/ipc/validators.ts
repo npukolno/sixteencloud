@@ -4,6 +4,7 @@ import { VISUALIZER_TYPES } from '../../shared/constants';
 import type { DownloadRequest } from '../../shared/types';
 import { isAllowedMediaUrl, isTrustedSoundCloudUrl } from '../../shared/security';
 import { KEYBIND_ACTIONS, parseCombo } from '../../shared/keybinds';
+import { isAudioFxState } from '../../shared/audio-fx';
 
 export const STORE_KEYS: ReadonlySet<string> = new Set([
   'language', 'firstLaunch', 'geoBypass', 'geoBypass.enabled', 'geoBypass.proxyUrl', 'geoBypass.spoofCountry',
@@ -14,7 +15,7 @@ export const STORE_KEYS: ReadonlySet<string> = new Set([
   'downloader.history', 'settings', 'settings.startMinimized', 'settings.launchOnStartup', 'settings.accentColor',
   'settings.dynamicAccent', 'settings.batterySaver', 'settings.ambient', 'player', 'player.skipPromoted', 'player.skipPreviews', 'player.notifications', 'player.scrobble', 'player.resume', 'player.speed', 'player.seekStep', 'searchHistory', 'wave',
   'settings.autoUpdate', 'settings.keybinds', 'history', 'history.enabled', 'history.maxTracks', 'history.tracks', 'history.stats', 'lyrics',
-  'lyrics.fontSize', 'themes', 'themes.active', 'themes.custom', 'customCss', 'customCss.code', 'equalizer', 'visualizer',
+  'lyrics.fontSize', 'themes', 'themes.active', 'themes.custom', 'customCss', 'customCss.code', 'equalizer', 'audioFx', 'visualizer',
   'sidebar',
   'sidebar.bookmarks', 'offlineCache', 'offlineCache.enabled', 'offlineCache.autoCache', 'offlineCache.maxSizeMB',
   'offlineCache.tracks',
@@ -84,6 +85,7 @@ export function validateStoreValue(key: string, value: unknown): void {
       throw new Error('Invalid equalizer state');
     }
   }
+  if (key === 'audioFx' && !isAudioFxState(value)) throw new Error('Invalid audio effects state');
   if (key === 'visualizer') {
     const state = value as { enabled?: unknown; type?: unknown; lyricsRing?: unknown } | null;
     if (!state || typeof state !== 'object' || Array.isArray(state) || typeof state.enabled !== 'boolean' ||

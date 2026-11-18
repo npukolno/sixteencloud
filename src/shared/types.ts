@@ -162,6 +162,11 @@ export interface StoreSchema {
     bands: number[];
     customPresets: Record<string, number[]>;
   };
+  /** Preamp and limiter / leveller on the master bus (shared/audio-fx.ts). */
+  audioFx: {
+    preamp: number;
+    mode: 'off' | 'limiter' | 'normalize';
+  };
   visualizer: {
     enabled: boolean;
     type: VisualizerType;

@@ -222,6 +222,10 @@ export const STORE_DEFAULTS = {
     bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     customPresets: {} as Record<string, number[]>,
   },
+  audioFx: {
+    preamp: 0,
+    mode: 'off' as 'off' | 'limiter' | 'normalize',
+  },
   visualizer: {
     enabled: true,
     type: 'wave',
