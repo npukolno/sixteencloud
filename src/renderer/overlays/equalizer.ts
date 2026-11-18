@@ -23,7 +23,7 @@ export function getEqualizerOverlayHTML(): string {
         </label>
       </div>
 
-      <div id="sc-eq-status" style="font-size: 12px; color: #555; margin-top: 4px; margin-bottom: 8px;">
+      <div id="sc-eq-status" style="font-size: 12px; color: var(--sc-text-subtle); margin-top: 4px; margin-bottom: 8px;">
         ${t('eq.audio_hint')}
       </div>
 

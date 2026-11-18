@@ -43,7 +43,7 @@ export function getLyricsOverlayHTML(): string {
         <div class="sc-lyrics-placeholder">${t('lyrics.placeholder')}</div>
       </div>
 
-      <div style="font-size: 11px; color: #444; text-align: center; padding: 8px 0;">${t('lyrics.powered_by')}</div>
+      <div style="font-size: 11px; color: var(--sc-text-subtle); text-align: center; padding: 8px 0;">${t('lyrics.powered_by')}</div>
     </div>
   `;
 }

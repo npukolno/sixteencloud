@@ -21,40 +21,40 @@ export function getThemesOverlayHTML(): string {
         </div>
       </div>
 
-      <div id="sc-theme-editor" style="display:none;margin-top:16px;padding:16px;background:#1a1a1a;border-radius:8px;border:1px solid #333;">
+      <div id="sc-theme-editor" style="display:none;margin-top:16px;padding:16px;background:var(--sc-surface);border-radius:8px;border:1px solid var(--sc-border);">
         <span class="sc-overlay-label">${t('themes.editor')}</span>
         <div class="sc-overlay-group" style="margin-top:8px;">
           <input type="text" id="sc-theme-name" class="sc-overlay-input" placeholder="${t('themes.name_placeholder')}" style="margin-bottom:8px;">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <div>
-              <label style="font-size:11px;color:#888;">${t('themes.color_bg')}</label>
-              <input type="color" id="sc-theme-c-bg" value="#1a1a2e" style="width:100%;height:32px;border:1px solid #444;border-radius:4px;background:#222;cursor:pointer;">
+              <label style="font-size:11px;color:var(--sc-text-muted);">${t('themes.color_bg')}</label>
+              <input type="color" id="sc-theme-c-bg" value="#1a1a2e" style="width:100%;height:32px;border:1px solid var(--sc-border-strong);border-radius:4px;background:var(--sc-surface-raised);cursor:pointer;">
             </div>
             <div>
-              <label style="font-size:11px;color:#888;">${t('themes.color_surface')}</label>
-              <input type="color" id="sc-theme-c-surface" value="#16213e" style="width:100%;height:32px;border:1px solid #444;border-radius:4px;background:#222;cursor:pointer;">
+              <label style="font-size:11px;color:var(--sc-text-muted);">${t('themes.color_surface')}</label>
+              <input type="color" id="sc-theme-c-surface" value="#16213e" style="width:100%;height:32px;border:1px solid var(--sc-border-strong);border-radius:4px;background:var(--sc-surface-raised);cursor:pointer;">
             </div>
             <div>
-              <label style="font-size:11px;color:#888;">${t('themes.color_accent')}</label>
-              <input type="color" id="sc-theme-c-accent" value="#e94560" style="width:100%;height:32px;border:1px solid #444;border-radius:4px;background:#222;cursor:pointer;">
+              <label style="font-size:11px;color:var(--sc-text-muted);">${t('themes.color_accent')}</label>
+              <input type="color" id="sc-theme-c-accent" value="#e94560" style="width:100%;height:32px;border:1px solid var(--sc-border-strong);border-radius:4px;background:var(--sc-surface-raised);cursor:pointer;">
             </div>
             <div>
-              <label style="font-size:11px;color:#888;">${t('themes.color_text')}</label>
-              <input type="color" id="sc-theme-c-text" value="#eaeaea" style="width:100%;height:32px;border:1px solid #444;border-radius:4px;background:#222;cursor:pointer;">
+              <label style="font-size:11px;color:var(--sc-text-muted);">${t('themes.color_text')}</label>
+              <input type="color" id="sc-theme-c-text" value="#eaeaea" style="width:100%;height:32px;border:1px solid var(--sc-border-strong);border-radius:4px;background:var(--sc-surface-raised);cursor:pointer;">
             </div>
             <div>
-              <label style="font-size:11px;color:#888;">${t('themes.color_border')}</label>
-              <input type="color" id="sc-theme-c-border" value="#2a2a4a" style="width:100%;height:32px;border:1px solid #444;border-radius:4px;background:#222;cursor:pointer;">
+              <label style="font-size:11px;color:var(--sc-text-muted);">${t('themes.color_border')}</label>
+              <input type="color" id="sc-theme-c-border" value="#2a2a4a" style="width:100%;height:32px;border:1px solid var(--sc-border-strong);border-radius:4px;background:var(--sc-surface-raised);cursor:pointer;">
             </div>
             <div>
-              <label style="font-size:11px;color:#888;">${t('themes.color_secondary')}</label>
-              <input type="color" id="sc-theme-c-secondary" value="#888888" style="width:100%;height:32px;border:1px solid #444;border-radius:4px;background:#222;cursor:pointer;">
+              <label style="font-size:11px;color:var(--sc-text-muted);">${t('themes.color_secondary')}</label>
+              <input type="color" id="sc-theme-c-secondary" value="#888888" style="width:100%;height:32px;border:1px solid var(--sc-border-strong);border-radius:4px;background:var(--sc-surface-raised);cursor:pointer;">
             </div>
           </div>
         </div>
         <div style="margin-top:12px;">
-          <span style="font-size:11px;color:#888;">${t('themes.preview')}</span>
-          <div id="sc-theme-preview" style="margin-top:4px;padding:12px;border-radius:6px;border:1px solid #333;">
+          <span style="font-size:11px;color:var(--sc-text-muted);">${t('themes.preview')}</span>
+          <div id="sc-theme-preview" style="margin-top:4px;padding:12px;border-radius:6px;border:1px solid var(--sc-border);">
             <div id="sc-tp-header" style="padding:8px 12px;border-radius:4px 4px 0 0;font-size:12px;font-weight:600;">SoundCloud</div>
             <div id="sc-tp-body" style="padding:12px;">
               <div id="sc-tp-title" style="font-size:13px;font-weight:600;margin-bottom:4px;">Track Title</div>
@@ -468,11 +468,11 @@ export function getThemesOverlayScript(): string {
         grid.innerHTML = Object.keys(BUILTIN_THEMES).map(function(id) {
           var th = BUILTIN_THEMES[id];
           var isActive = id === activeTheme;
-          return '<div class="sc-theme-card' + (isActive ? ' active' : '') + '" data-theme="' + id + '" style="cursor:pointer;padding:12px;background:#1a1a1a;border-radius:8px;border:2px solid ' + (isActive ? '#f50' : '#333') + ';margin-bottom:8px;">' +
-            '<div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:8px;">' + window.__scEscapeHtml(th.name) + '</div>' +
+          return '<div class="sc-theme-card' + (isActive ? ' active' : '') + '" data-theme="' + id + '" style="cursor:pointer;padding:12px;background:var(--sc-surface);border-radius:8px;border:2px solid ' + (isActive ? 'var(--sc-accent)' : 'var(--sc-border)') + ';margin-bottom:8px;">' +
+            '<div style="font-size:14px;font-weight:600;color:var(--sc-text);margin-bottom:8px;">' + window.__scEscapeHtml(th.name) + '</div>' +
             '<div style="display:flex;gap:4px;">' +
             th.colors.map(function(c) {
-              return '<div style="width:24px;height:24px;border-radius:50%;background:' + safeColor(c) + ';border:1px solid #555;"></div>';
+              return '<div style="width:24px;height:24px;border-radius:50%;background:' + safeColor(c) + ';border:1px solid var(--sc-border-strong);"></div>';
             }).join('') +
             '</div></div>';
         }).join('');
@@ -487,23 +487,23 @@ export function getThemesOverlayScript(): string {
       function renderCustomGrid() {
         var ids = Object.keys(customThemes);
         if (!ids.length) {
-          customGrid.innerHTML = '<div style="color:#666;font-size:12px;padding:8px 0;">' + '—' + '</div>';
+          customGrid.innerHTML = '<div style="color:var(--sc-text-subtle);font-size:12px;padding:8px 0;">' + '—' + '</div>';
           return;
         }
         customGrid.innerHTML = ids.map(function(id) {
           var th = customThemes[id];
           var isActive = id === activeTheme;
-          return '<div class="sc-theme-card' + (isActive ? ' active' : '') + '" data-theme="' + window.__scEscapeHtml(id) + '" style="cursor:pointer;padding:12px;background:#1a1a1a;border-radius:8px;border:2px solid ' + (isActive ? '#f50' : '#333') + ';margin-bottom:8px;position:relative;">' +
+          return '<div class="sc-theme-card' + (isActive ? ' active' : '') + '" data-theme="' + window.__scEscapeHtml(id) + '" style="cursor:pointer;padding:12px;background:var(--sc-surface);border-radius:8px;border:2px solid ' + (isActive ? 'var(--sc-accent)' : 'var(--sc-border)') + ';margin-bottom:8px;position:relative;">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
-              '<div style="font-size:14px;font-weight:600;color:#fff;">' + window.__scEscapeHtml(th.name) + '</div>' +
+              '<div style="font-size:14px;font-weight:600;color:var(--sc-text);">' + window.__scEscapeHtml(th.name) + '</div>' +
               '<div style="display:flex;gap:4px;">' +
-                '<button class="sc-ct-export" data-id="' + window.__scEscapeHtml(id) + '" style="background:none;border:1px solid #555;color:#aaa;border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer;">' + _t('themes.export') + '</button>' +
-                '<button class="sc-ct-delete" data-id="' + window.__scEscapeHtml(id) + '" style="background:none;border:1px solid #e74c3c;color:#e74c3c;border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer;">' + _t('themes.delete') + '</button>' +
+                '<button class="sc-ct-export" data-id="' + window.__scEscapeHtml(id) + '" style="background:none;border:1px solid var(--sc-border-strong);color:var(--sc-text-muted);border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer;">' + _t('themes.export') + '</button>' +
+                '<button class="sc-ct-delete" data-id="' + window.__scEscapeHtml(id) + '" style="background:none;border:1px solid var(--sc-danger);color:var(--sc-danger);border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer;">' + _t('themes.delete') + '</button>' +
               '</div>' +
             '</div>' +
             '<div style="display:flex;gap:4px;">' +
             th.colors.map(function(c) {
-              return '<div style="width:24px;height:24px;border-radius:50%;background:' + safeColor(c) + ';border:1px solid #555;"></div>';
+              return '<div style="width:24px;height:24px;border-radius:50%;background:' + safeColor(c) + ';border:1px solid var(--sc-border-strong);"></div>';
             }).join('') +
             '</div></div>';
         }).join('');
@@ -535,8 +535,8 @@ export function getThemesOverlayScript(): string {
             e.stopPropagation();
             var id = btn.getAttribute('data-id');
             btn.textContent = '?';
-            btn.style.background = '#e74c3c'; btn.style.color = '#fff';
-            var timer = setTimeout(function() { btn.textContent = _t('themes.delete'); btn.style.background = ''; btn.style.color = '#e74c3c'; }, 3000);
+            btn.style.background = 'var(--sc-danger)'; btn.style.color = '#fff';
+            var timer = setTimeout(function() { btn.textContent = _t('themes.delete'); btn.style.background = ''; btn.style.color = 'var(--sc-danger)'; }, 3000);
             btn.onclick = function(e2) {
               e2.stopPropagation();
               clearTimeout(timer);
@@ -598,7 +598,7 @@ export function getThemesOverlayScript(): string {
 
       saveBtn.addEventListener('click', function() {
         var name = nameInput.value.trim();
-        if (!name) { nameInput.style.borderColor = '#e74c3c'; nameInput.placeholder = _t('themes.name_required'); return; }
+        if (!name) { nameInput.style.borderColor = 'var(--sc-danger)'; nameInput.placeholder = _t('themes.name_required'); return; }
         var id = editingThemeId || 'custom_' + Date.now();
         var palette = {
           bg: cBg.value, surface: cSurface.value, accent: cAccent.value,
@@ -625,7 +625,7 @@ export function getThemesOverlayScript(): string {
             saveCustomThemes();
             renderGrids();
           } catch(e) {
-            importBtn.textContent = _t('themes.import_error'); importBtn.style.color = '#e74c3c'; setTimeout(function() { importBtn.textContent = _t('themes.import'); importBtn.style.color = ''; }, 2000);
+            importBtn.textContent = _t('themes.import_error'); importBtn.style.color = 'var(--sc-danger)'; setTimeout(function() { importBtn.textContent = _t('themes.import'); importBtn.style.color = ''; }, 2000);
           }
         };
         reader.readAsText(file);
@@ -637,7 +637,7 @@ export function getThemesOverlayScript(): string {
       overlayBody.addEventListener('dragover', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        overlayBody.style.border = '2px dashed #f50';
+        overlayBody.style.border = '2px dashed var(--sc-accent)';
         overlayBody.style.borderRadius = '8px';
       });
       overlayBody.addEventListener('dragleave', function(e) {
@@ -665,7 +665,7 @@ export function getThemesOverlayScript(): string {
                 saveCustomThemes();
                 renderGrids();
               } catch(e) {
-                importBtn.textContent = _t('themes.import_error'); importBtn.style.color = '#e74c3c'; setTimeout(function() { importBtn.textContent = _t('themes.import'); importBtn.style.color = ''; }, 2000);
+                importBtn.textContent = _t('themes.import_error'); importBtn.style.color = 'var(--sc-danger)'; setTimeout(function() { importBtn.textContent = _t('themes.import'); importBtn.style.color = ''; }, 2000);
               }
             };
             reader.readAsText(f);

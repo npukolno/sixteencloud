@@ -643,7 +643,7 @@ export function getSettingsOverlayScript(): string {
         var box = document.createElement('div');
         box.id = 'sc-confirm-reset';
         box.style.cssText = 'margin-top:8px;padding:10px;background:var(--sc-danger-soft);border:1px solid var(--sc-danger);border-radius:6px;display:flex;align-items:center;justify-content:space-between;';
-        box.innerHTML = '<span style="color:var(--sc-danger);font-size:12px;">' + _t('settings.reset_confirm') + '</span><div style="display:flex;gap:6px;"><button id="sc-confirm-yes" style="background:var(--sc-danger);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">' + _t('common.yes') + '</button><button id="sc-confirm-no" style="background:var(--sc-surface-raised);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">' + _t('common.no') + '</button></div>';
+        box.innerHTML = '<span style="color:var(--sc-danger);font-size:12px;">' + _t('settings.reset_confirm') + '</span><div style="display:flex;gap:6px;"><button id="sc-confirm-yes" style="background:var(--sc-danger);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">' + _t('common.yes') + '</button><button id="sc-confirm-no" style="background:var(--sc-surface-raised);color:var(--sc-text);border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">' + _t('common.no') + '</button></div>';
         resetAll.parentNode.insertBefore(box, resetAll.nextSibling);
         box.querySelector('#sc-confirm-yes').onclick = function() {
           api.storeSet('settings', { startMinimized: false, launchOnStartup: false, accentColor: '#ff5500', autoUpdate: true, keybinds: {} }).then(function() {
