@@ -3,6 +3,7 @@ import { getAmbientScript } from './ambient';
 import { getStatusHubScript } from './status-hub';
 import { getHotButtonsScript } from './hot-buttons';
 import { getRepostsScript } from './reposts';
+import { getQueueExportScript } from './queue-export';
 
 // Page scripts for the smaller in-page features. main.ts injects this list
 // after the player core (they rely on window.__scPlayer and the visualizer's
@@ -14,5 +15,6 @@ export function getExtrasScripts(): Array<readonly [string, string]> {
     ['ambient', getAmbientScript()],
     ['hot buttons', getHotButtonsScript()],
     ['reposts', getRepostsScript()],
+    ['queue export', getQueueExportScript()],
   ];
 }

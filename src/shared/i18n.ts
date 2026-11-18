@@ -239,6 +239,11 @@ const en: Record<string, string> = {
   'downloader.queue_resume': 'Resume Queue',
   'downloader.add_to_queue': 'Add to Queue',
   'downloader.download_liked': 'Download Liked Tracks',
+  'downloader.export_queue': 'Download the play queue (Next up)',
+  'queue.reading': 'Reading the play queue...',
+  'queue.added': 'Play queue added to downloads ({count} tracks)',
+  'queue.empty': 'The play queue is empty or could not be read',
+  'queue.failed': 'Could not read the play queue',
   'downloader.liked_requires_auth': 'OAuth token required',
   'downloader.fetching_likes': 'Fetching liked tracks...',
 
@@ -722,6 +727,11 @@ const ru: Record<string, string> = {
   'downloader.queue_resume': 'Возобновить очередь',
   'downloader.add_to_queue': 'В очередь',
   'downloader.download_liked': 'Скачать лайки',
+  'downloader.export_queue': 'Скачать очередь воспроизведения',
+  'queue.reading': 'Читаю очередь воспроизведения...',
+  'queue.added': 'Очередь добавлена в загрузки (треков: {count})',
+  'queue.empty': 'Очередь пуста или её не удалось прочитать',
+  'queue.failed': 'Не удалось прочитать очередь',
   'downloader.liked_requires_auth': 'Требуется OAuth токен',
   'downloader.fetching_likes': 'Получение лайкнутых треков...',
 

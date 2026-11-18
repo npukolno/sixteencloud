@@ -19,6 +19,10 @@ export const SC = {
   TIMELINE_WRAPPER: '.playbackTimeline__progressWrapper',
   TIMELINE_DURATION: '.playbackTimeline__duration span[aria-hidden]',
   MAIN_CONTENT: '.l-main',
+  /** Next up (play queue): toggle in the player badge, the panel and one row. */
+  QUEUE_TOGGLE: '.playbackSoundBadge__showQueue, .playControls__queue button',
+  QUEUE_PANEL: '.queue',
+  QUEUE_ITEM: '.queueItemView, .queue__itemWrapper',
   /** One entry of the home feed and its title link (href = track/playlist path). */
   FEED_ITEM: '.soundList__item',
   FEED_ITEM_TITLE: 'a.soundTitle__title',
