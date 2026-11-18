@@ -196,6 +196,7 @@ export const STORE_DEFAULTS = {
     notifications: false,
     scrobble: false,
     speed: 1,
+    seekStep: 10,
   },
   searchHistory: [] as string[],
   wave: {

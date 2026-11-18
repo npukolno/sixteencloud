@@ -12,7 +12,7 @@ export const STORE_KEYS: ReadonlySet<string> = new Set([
   'adblocker', 'adblocker.enabled', 'adblocker.blockedCount', 'adblocker.customRules', 'adblocker.whitelist',
   'adblocker.remoteDomains', 'adblocker.lastUpdated', 'downloader', 'downloader.outputDir', 'downloader.quality',
   'downloader.history', 'settings', 'settings.startMinimized', 'settings.launchOnStartup', 'settings.accentColor',
-  'settings.dynamicAccent', 'settings.batterySaver', 'settings.ambient', 'player', 'player.skipPromoted', 'player.skipPreviews', 'player.notifications', 'player.scrobble', 'player.resume', 'player.speed', 'searchHistory', 'wave',
+  'settings.dynamicAccent', 'settings.batterySaver', 'settings.ambient', 'player', 'player.skipPromoted', 'player.skipPreviews', 'player.notifications', 'player.scrobble', 'player.resume', 'player.speed', 'player.seekStep', 'searchHistory', 'wave',
   'settings.autoUpdate', 'settings.keybinds', 'history', 'history.enabled', 'history.maxTracks', 'history.tracks', 'history.stats', 'lyrics',
   'lyrics.fontSize', 'themes', 'themes.active', 'themes.custom', 'customCss', 'customCss.code', 'equalizer', 'visualizer',
   'sidebar',
@@ -46,6 +46,9 @@ export function validateStoreValue(key: string, value: unknown): void {
   if (BOOLEAN_KEYS.has(key) && typeof value !== 'boolean') throw new Error('Invalid flag');
   if (key === 'player.speed' && (typeof value !== 'number' || !Number.isFinite(value) || value < 0.25 || value > 3)) {
     throw new Error('Invalid speed');
+  }
+  if (key === 'player.seekStep' && value !== 5 && value !== 10 && value !== 15 && value !== 30) {
+    throw new Error('Invalid seek step');
   }
   if (key === 'wave') {
     if (!value || typeof value !== 'object' || Array.isArray(value) || JSON.stringify(value).length > 250000) throw new Error('Invalid wave data');

@@ -1,4 +1,6 @@
-export const KEYBIND_ACTIONS = ['sidebar', 'rail', 'playPause', 'volumeUp', 'volumeDown', 'miniPlayer'] as const;
+export const KEYBIND_ACTIONS = ['sidebar', 'rail', 'playPause', 'volumeUp', 'volumeDown', 'miniPlayer', 'seekBack', 'seekForward', 'loopAB'] as const;
+/** Actions the main process forwards to the page (window.__scKeyAction). */
+export const PAGE_KEYBIND_ACTIONS = ['seekBack', 'seekForward', 'loopAB'] as const;
 export type KeybindAction = (typeof KEYBIND_ACTIONS)[number];
 
 export type Keybinds = Partial<Record<KeybindAction, string>>;
@@ -29,6 +31,10 @@ const DEFAULT_CODES: Record<KeybindAction, string> = {
   volumeUp: 'Ctrl+ArrowUp',
   volumeDown: 'Ctrl+ArrowDown',
   miniPlayer: 'Ctrl+KeyP',
+  // Alt+letter: free in SoundCloud and harmless in text fields.
+  seekBack: 'Alt+KeyJ',
+  seekForward: 'Alt+KeyL',
+  loopAB: 'Alt+KeyK',
 };
 
 const KEY_LABELS: Record<string, string> = {

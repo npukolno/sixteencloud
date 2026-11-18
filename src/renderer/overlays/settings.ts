@@ -87,6 +87,18 @@ export function getSettingsOverlayHTML(): string {
             <button class="sc-overlay-badge sc-keybind-btn" type="button" data-action="miniPlayer"></button>
           </div>
           <div class="sc-overlay-list-item">
+            <span class="sc-overlay-list-item-title">${t('settings.kb_seek_back')}</span>
+            <button class="sc-overlay-badge sc-keybind-btn" type="button" data-action="seekBack"></button>
+          </div>
+          <div class="sc-overlay-list-item">
+            <span class="sc-overlay-list-item-title">${t('settings.kb_seek_forward')}</span>
+            <button class="sc-overlay-badge sc-keybind-btn" type="button" data-action="seekForward"></button>
+          </div>
+          <div class="sc-overlay-list-item">
+            <span class="sc-overlay-list-item-title">${t('settings.kb_loop_ab')}</span>
+            <button class="sc-overlay-badge sc-keybind-btn" type="button" data-action="loopAB"></button>
+          </div>
+          <div class="sc-overlay-list-item">
             <span class="sc-overlay-list-item-title">${t('settings.close_panel')}</span>
             <span class="sc-overlay-badge">Esc</span>
           </div>

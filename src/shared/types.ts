@@ -135,6 +135,8 @@ export interface StoreSchema {
     speed: number;
     /** Jump back to the remembered position after a restart (default on). */
     resume?: boolean;
+    /** Seconds per seek step (5, 10, 15 or 30; default 10). */
+    seekStep?: number;
   };
   searchHistory: string[];
   wave: {

@@ -1,4 +1,7 @@
 import { t, getScriptTranslations } from '../../shared/i18n';
+import { abLoopMark, abLoopTarget, seekTarget, normalizeSeekStep, SEEK_STEPS } from '../../shared/ab-loop';
+import { defaultKeybinds } from '../../shared/keybinds';
+import { scJs } from '../../shared/sc-selectors';
 
 // "Player" panel: promoted-track skipping, playback speed, sleep timer,
 // track notifications and ListenBrainz scrobbling.
@@ -38,6 +41,23 @@ export function getPlayerToolsOverlayHTML(): string {
           <span id="sc-pl-speed-val" style="min-width:42px;text-align:right;font-size:12px;color:var(--sc-text-muted)">1.00x</span>
           <button class="sc-overlay-btn sc-overlay-btn-secondary" id="sc-pl-speed-reset">${t('settings.reset')}</button>
         </div>
+      </div>
+
+      <div class="sc-overlay-group" style="margin-top:16px">
+        <span class="sc-overlay-label">${t('player.seek')}</span>
+        <div class="sc-pl-line">
+          <span class="sc-pl-sub">${t('player.seek_step')}</span>
+          <div class="sc-pl-chips" id="sc-pl-step-chips">
+            ${SEEK_STEPS.map(step => `<button class="sc-overlay-btn sc-overlay-btn-secondary" data-step="${step}">${step} ${t('player.sec')}</button>`).join('')}
+          </div>
+        </div>
+        <div class="sc-pl-line" style="margin-top:8px">
+          <button class="sc-overlay-btn sc-overlay-btn-secondary" id="sc-pl-seek-back"></button>
+          <button class="sc-overlay-btn sc-overlay-btn-secondary" id="sc-pl-seek-fwd"></button>
+          <button class="sc-overlay-btn sc-overlay-btn-secondary" id="sc-pl-ab">${t('player.ab_set_a')}</button>
+          <span id="sc-pl-ab-status" class="sc-pl-status">${t('player.ab_off')}</span>
+        </div>
+        <div class="sc-pl-desc" id="sc-pl-ab-hint" style="margin-top:6px;max-width:none"></div>
       </div>
 
       <div class="sc-overlay-group" style="margin-top:16px">
@@ -85,7 +105,9 @@ export function getPlayerToolsOverlayHTML(): string {
 
 export function getPlayerToolsOverlayScript(): string {
   const _tr = JSON.stringify(getScriptTranslations([
-    'player.sleep_off', 'player.sleep_in', 'player.sleep_track', 'player.sleep_toast', 'player.lb_ok', 'player.lb_bad', 'player.lb_none', 'player.lb_checking',
+    'player.sleep_off', 'player.sleep_in', 'player.sleep_track', 'player.sleep_toast',
+    'player.sec', 'player.ab_set_a', 'player.ab_set_b', 'player.ab_clear', 'player.ab_off', 'player.ab_waiting', 'player.ab_on',
+    'player.ab_toast_a', 'player.ab_toast_on', 'player.ab_toast_off', 'player.ab_hint', 'player.lb_ok', 'player.lb_bad', 'player.lb_none', 'player.lb_checking',
   ]));
   return `
     (function() {
@@ -102,7 +124,13 @@ export function getPlayerToolsOverlayScript(): string {
       style.textContent =
         '.sc-pl-desc{font-size:11px;opacity:.6;margin-top:2px;max-width:320px}' +
         '.sc-pl-chips{display:flex;flex-wrap:wrap;gap:6px}' +
-        '.sc-pl-chips .sc-overlay-btn.on{background:var(--sc-accent);color:var(--sc-accent-foreground,#fff)}';
+        '.sc-pl-chips .sc-overlay-btn.on{background:var(--sc-accent);color:var(--sc-accent-foreground,#fff)}' +
+        '.sc-pl-line{display:flex;flex-wrap:wrap;align-items:center;gap:8px}' +
+        '.sc-pl-sub{font-size:12px;color:var(--sc-text-muted);min-width:36px}' +
+        '.sc-pl-status{font-size:12px;color:var(--sc-text-muted);flex:1;min-width:120px;font-variant-numeric:tabular-nums}' +
+        '#sc-pl-ab.on{background:var(--sc-accent);color:var(--sc-accent-foreground,#fff)}' +
+        '.sc-ab-band{position:absolute;top:0;bottom:0;pointer-events:none;z-index:1;border-left:2px solid var(--sc-accent);background:rgba(var(--sc-accent-rgb),.22)}' +
+        '.sc-ab-band.open{background:none;width:0 !important}';
       document.head.appendChild(style);
 
       function $(id) { return panel.querySelector(id); }
@@ -154,6 +182,143 @@ export function getPlayerToolsOverlayScript(): string {
       speedReset.addEventListener('click', function() { speed.value = '1'; speedVal.textContent = '1.00x'; window.__scCfgSet('speed', 1); applySpeed(); });
       // SoundCloud resets the rate whenever it loads the next stream.
       setInterval(applySpeed, 1500);
+
+      // ---- Seek steps and the A-B loop (math in shared/ab-loop.ts) ----
+      ${abLoopMark.toString()}
+      ${abLoopTarget.toString()}
+      ${seekTarget.toString()}
+      ${normalizeSeekStep.toString()}
+
+      var TIMELINE = ${scJs('TIMELINE_WRAPPER')};
+      var stepChips = $('#sc-pl-step-chips'), seekBackBtn = $('#sc-pl-seek-back'), seekFwdBtn = $('#sc-pl-seek-fwd');
+      var abBtn = $('#sc-pl-ab'), abStatus = $('#sc-pl-ab-status'), abHint = $('#sc-pl-ab-hint');
+      var loop = null, loopPath = '', loopTimer = null;
+
+      function clock(sec) {
+        var s = Math.max(0, Math.floor(sec || 0));
+        var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+        return (h ? h + ':' + ('0' + m).slice(-2) : String(m)) + ':' + ('0' + r).slice(-2);
+      }
+      function fill(key, p) { var str = _t(key); for (var k in p) str = str.replace('{' + k + '}', p[k]); return str; }
+
+      // Position from the audio element (precise), else from the timeline.
+      function position() {
+        var au = window.__scAudioElement;
+        if (au && isFinite(au.currentTime) && isFinite(au.duration) && au.duration > 0) return { t: au.currentTime, d: au.duration };
+        var w = document.querySelector(TIMELINE);
+        if (!w) return null;
+        var t = parseFloat(w.getAttribute('aria-valuenow')), d = parseFloat(w.getAttribute('aria-valuemax'));
+        return isFinite(t) && isFinite(d) && d > 0 ? { t: t, d: d } : null;
+      }
+      // While audio is loaded, currentTime seeks to the exact second (the
+      // timeline is one pixel per several seconds on a long mix); otherwise
+      // go through SoundCloud's own timeline like a click would.
+      function seekTo(t) {
+        var au = window.__scAudioElement;
+        if (au && au.readyState >= 2 && isFinite(au.duration) && au.duration > 0) {
+          try { au.currentTime = t; return true; } catch (e) {}
+        }
+        var p = position();
+        return !!(p && typeof window.__scPlayerSeek === 'function' && window.__scPlayerSeek(t / p.d));
+      }
+      function step() { return normalizeSeekStep(cfg().seekStep); }
+      function seekBy(sign) {
+        var p = position();
+        if (p) seekTo(seekTarget(p.t, sign * step(), p.d));
+      }
+      function currentPath() {
+        var c = window.__scPlayer && window.__scPlayer.current();
+        return c ? c.path : '';
+      }
+
+      function renderBand() {
+        var old = document.querySelector('.sc-ab-band');
+        var p = position();
+        if (!loop || loop.a === null || !p) { if (old) old.remove(); return; }
+        var wrap = document.querySelector(TIMELINE);
+        if (!wrap) return;
+        var band = old && old.parentNode === wrap ? old : null;
+        if (!band) {
+          if (old) old.remove();
+          if (getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
+          band = document.createElement('div');
+          band.className = 'sc-ab-band';
+          wrap.appendChild(band);
+        }
+        band.classList.toggle('open', loop.b === null);
+        band.style.left = (loop.a / p.d * 100) + '%';
+        band.style.width = loop.b === null ? '0' : ((loop.b - loop.a) / p.d * 100) + '%';
+      }
+      function renderAB() {
+        var s = step();
+        seekBackBtn.textContent = '−' + s + ' ' + _t('player.sec');
+        seekFwdBtn.textContent = '+' + s + ' ' + _t('player.sec');
+        Array.prototype.forEach.call(stepChips.querySelectorAll('button'), function(b) {
+          b.classList.toggle('on', Number(b.getAttribute('data-step')) === s);
+        });
+        var on = !!(loop && loop.a !== null);
+        abBtn.classList.toggle('on', on);
+        if (!on) { abBtn.textContent = _t('player.ab_set_a'); abStatus.textContent = _t('player.ab_off'); }
+        else if (loop.b === null) { abBtn.textContent = _t('player.ab_set_b'); abStatus.textContent = fill('player.ab_waiting', { a: clock(loop.a) }); }
+        else { abBtn.textContent = _t('player.ab_clear'); abStatus.textContent = fill('player.ab_on', { a: clock(loop.a), b: clock(loop.b) }); }
+        renderBand();
+      }
+      function stopLoopTimer() { if (loopTimer) { clearInterval(loopTimer); loopTimer = null; } }
+      function clearLoop() { loop = null; stopLoopTimer(); renderAB(); }
+      function markAB() {
+        var p = position();
+        if (!p) return;
+        loop = abLoopMark(loop && currentPath() === loopPath ? loop : null, p.t, p.d);
+        loopPath = currentPath();
+        renderAB();
+        var toast = window.__scToast;
+        if (loop.a === null) { stopLoopTimer(); if (toast) toast(_t('player.ab_toast_off')); return; }
+        if (loop.b === null) { if (toast) toast(fill('player.ab_toast_a', { a: clock(loop.a) })); }
+        else if (toast) toast(fill('player.ab_toast_on', { a: clock(loop.a), b: clock(loop.b) }), { kind: 'success' });
+        if (!loopTimer) loopTimer = setInterval(function() {
+          // A loop belongs to its track: a new track drops it.
+          if (currentPath() !== loopPath) { clearLoop(); return; }
+          var au = window.__scAudioElement;
+          var target = au && !au.paused ? abLoopTarget(loop, au.currentTime, 0.15) : null;
+          if (target !== null) seekTo(target);
+        }, 100);
+      }
+
+      stepChips.addEventListener('click', function(e) {
+        var b = e.target.closest ? e.target.closest('button') : null;
+        if (!b) return;
+        window.__scCfgSet('seekStep', normalizeSeekStep(Number(b.getAttribute('data-step'))));
+        renderAB();
+      });
+      seekBackBtn.addEventListener('click', function() { seekBy(-1); });
+      seekFwdBtn.addEventListener('click', function() { seekBy(1); });
+      abBtn.addEventListener('click', markAB);
+      window.addEventListener('resize', function() { if (loop) renderBand(); });
+
+      // Hotkeys are matched in the main process (registerKeybinds) and land here.
+      window.__scKeyAction = function(action) {
+        if (action === 'seekBack') seekBy(-1);
+        else if (action === 'seekForward') seekBy(1);
+        else if (action === 'loopAB') markAB();
+      };
+
+      var KEY_DEFAULTS = ${JSON.stringify(defaultKeybinds(process.platform))};
+      function keyLabel(combo) {
+        return String(combo || '').split('+').map(function(p) {
+          return p.replace(/^Key([A-Z])$/, '$1').replace(/^Digit([0-9])$/, '$1').replace(/^Arrow/, '');
+        }).join('+');
+      }
+      function renderHint() {
+        api.storeGet('settings.keybinds').then(function(kb) {
+          var k = Object.assign({}, KEY_DEFAULTS, kb && typeof kb === 'object' ? kb : {});
+          abHint.textContent = fill('player.ab_hint', { back: keyLabel(k.seekBack), fwd: keyLabel(k.seekForward), loop: keyLabel(k.loopAB) });
+        }).catch(function() {});
+      }
+      renderHint();
+      renderAB();
+      // Settings may have changed the keys while this panel was closed.
+      new MutationObserver(function() { if (panel.classList.contains('active')) renderHint(); })
+        .observe(panel, { attributes: true, attributeFilter: ['class'] });
 
       // ---- Sleep timer ----
       var sleepEnd = 0;       // epoch ms, 0 = off

@@ -34,7 +34,7 @@ import { getSearchPlusScript } from '../renderer/overlays/search-plus';
 import { getExtrasScripts } from '../renderer/overlays/extras';
 import { getPlayerToolsOverlayHTML, getPlayerToolsOverlayScript } from '../renderer/overlays/player-tools';
 import { isSafeExternalUrl, isTrustedOAuthUrl, isTrustedSoundCloudUrl } from '../shared/security';
-import { matchesCombo, resolveKeybinds, type KeybindAction } from '../shared/keybinds';
+import { matchesCombo, resolveKeybinds, PAGE_KEYBIND_ACTIONS, type KeybindAction } from '../shared/keybinds';
 
 let mainWindow: BrowserWindow | null = null;
 let splashWindow: BrowserWindow | null = null;
@@ -1679,6 +1679,15 @@ function registerKeybinds(win: BrowserWindow): void {
     if (match('miniPlayer')) {
       event.preventDefault();
       toggleMiniPlayer();
+      return;
+    }
+
+    // Seek steps and the A-B loop live in the page (player-tools.ts).
+    const pageAction = PAGE_KEYBIND_ACTIONS.find(match);
+    if (pageAction) {
+      event.preventDefault();
+      runInPage(win, `window.__scKeyAction && window.__scKeyAction(${JSON.stringify(pageAction)})`)
+        .catch((e: any) => logWarn('key action error:', e?.message));
       return;
     }
 
