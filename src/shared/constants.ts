@@ -270,6 +270,8 @@ export const IPC_CHANNELS = {
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
   SETTINGS_CLEAR_CACHE: 'settings:clear-cache',
+  SETTINGS_EXPORT: 'settings:export',
+  SETTINGS_IMPORT: 'settings:import',
   TRACK_INFO: 'track:info',
   WINDOW_MINIMIZE: 'window:minimize',
   WINDOW_MAXIMIZE: 'window:maximize',

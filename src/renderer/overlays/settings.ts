@@ -188,6 +188,16 @@ export function getSettingsOverlayHTML(): string {
       </div>
 
       <div class="sc-overlay-group" style="margin-top: 20px;">
+        <span class="sc-overlay-label">${t('settings.profile')}</span>
+        <div style="font-size:11px;opacity:.6;margin:2px 0 8px;">${t('settings.profile_desc')}</div>
+        <div style="display:flex;gap:8px;">
+          <button class="sc-overlay-btn sc-overlay-btn-secondary" id="sc-set-profile-export" style="flex:1;">${t('settings.profile_export')}</button>
+          <button class="sc-overlay-btn sc-overlay-btn-secondary" id="sc-set-profile-import" style="flex:1;">${t('settings.profile_import')}</button>
+        </div>
+        <div id="sc-set-profile-status" style="font-size:12px;color:var(--sc-text-muted);margin-top:6px;min-height:16px;"></div>
+      </div>
+
+      <div class="sc-overlay-group" style="margin-top: 20px;">
         <button class="sc-overlay-btn sc-overlay-btn-secondary sc-overlay-btn-full" id="sc-set-clear-cache">
           ${t('settings.clear_cache')}
         </button>
@@ -212,6 +222,7 @@ export function getSettingsOverlayScript(): string {
     'settings.check_failed', 'settings.clearing', 'settings.cache_cleared',
     'settings.clear_cache', 'settings.reset_confirm',
     'settings.download_update', 'settings.downloading_update', 'settings.restart_to_update',
+    'settings.profile_exported', 'settings.profile_imported', 'settings.profile_failed',
     'common.yes', 'common.no',
   ]));
   const _appVersion = app.getVersion();
@@ -653,6 +664,36 @@ export function getSettingsOverlayScript(): string {
       api.storeGet('settings.keybinds').then(function(v) {
         keybinds = (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
         renderKeybinds();
+      });
+
+      // ---- Settings profile (export / import as one JSON file) ----
+      var profileStatus = panel.querySelector('#sc-set-profile-status');
+      var profileExport = panel.querySelector('#sc-set-profile-export');
+      var profileImport = panel.querySelector('#sc-set-profile-import');
+      function profileSay(text, kind) {
+        profileStatus.textContent = text;
+        profileStatus.style.color = kind === 'error' ? 'var(--sc-danger)' : kind === 'success' ? 'var(--sc-success)' : 'var(--sc-text-muted)';
+        if (window.__scToast && text) window.__scToast(text, { kind: kind });
+      }
+      profileExport.addEventListener('click', function() {
+        if (typeof api.settingsExport !== 'function') return;
+        profileExport.disabled = true;
+        api.settingsExport().then(function(r) {
+          if (r && !r.canceled) profileSay(_t('settings.profile_exported', { count: String(r.count || 0) }), 'success');
+        }).catch(function() { profileSay(_t('settings.profile_failed'), 'error'); })
+          .then(function() { profileExport.disabled = false; });
+      });
+      profileImport.addEventListener('click', function() {
+        if (typeof api.settingsImport !== 'function') return;
+        profileImport.disabled = true;
+        api.settingsImport().then(function(r) {
+          if (!r || r.canceled) return;
+          if (r.error) { profileSay(_t('settings.profile_failed') + ': ' + r.error, 'error'); return; }
+          profileSay(_t('settings.profile_imported', { count: String(r.applied || 0), skipped: String(r.skipped || 0) }), 'success');
+          // Themes, CSS, EQ and the rest are read at page start: reload once.
+          setTimeout(function() { window.location.reload(); }, 1200);
+        }).catch(function() { profileSay(_t('settings.profile_failed'), 'error'); })
+          .then(function() { profileImport.disabled = false; });
       });
 
       clearCache.addEventListener('click', function() {

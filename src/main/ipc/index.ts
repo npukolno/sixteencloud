@@ -7,6 +7,7 @@ import { setupDownloaderIPC } from './downloader';
 import { setupHistoryIPC } from './history';
 import { setupLyricsIPC } from './lyrics';
 import { setupQuickActionsIPC } from './quick-actions';
+import { setupProfileIPC } from './profile';
 
 export { getStore, getEncryptionKey, getSecret, setSecret } from './store';
 export { assertMainRenderer, safeSend } from './guard';
@@ -24,4 +25,5 @@ export function setupIPC(mainWindow: BrowserWindow): void {
   setupHistoryIPC(mainWindow);
   setupLyricsIPC(mainWindow);
   setupQuickActionsIPC(mainWindow);
+  setupProfileIPC(mainWindow);
 }

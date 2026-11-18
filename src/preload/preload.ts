@@ -93,6 +93,12 @@ const api = {
   // Settings
   settingsClearCache: (): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_CLEAR_CACHE),
+  /** Save every customisable setting to a JSON file (native save dialog, no secrets). */
+  settingsExport: (): Promise<{ canceled: boolean; count?: number }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_EXPORT),
+  /** Load a settings JSON file (native open dialog); every key is validated in main. */
+  settingsImport: (): Promise<{ canceled: boolean; applied?: number; skipped?: number; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_IMPORT),
 
   // Window controls
   windowMinimize: (): void => ipcRenderer.send(IPC_CHANNELS.WINDOW_MINIMIZE),
