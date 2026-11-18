@@ -106,7 +106,9 @@ export function installAudioHook(): void {
         if (bus) {
           const args = Array.prototype.slice.call(arguments);
           args[0] = bus.input;
-          return origConnect.apply(this, args);
+          origConnect.apply(this, args);
+          // Native connect() returns the node passed in; chained calls rely on it.
+          return dest;
         }
       }
       return origConnect.apply(this, arguments as any);
