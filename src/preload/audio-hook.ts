@@ -44,6 +44,25 @@ export function installAudioHook(): void {
   const origDisconnect = NodeProto && NodeProto.disconnect;
   const buses: any[] = [];
   let fxParams: any = { gain: 1, dry: 1, wet: 0, threshold: -24, knee: 30, ratio: 12, attack: 0.003, release: 0.25 };
+  // 10-band EQ lives in the bus too: SoundCloud reconnects its own nodes at
+  // will, so filters spliced into its chain silently fell out of the path.
+  const EQ_FREQS = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+  let eqGains: number[] = EQ_FREQS.map(() => 0);
+
+  function applyEq(bus: any, smooth: boolean): void {
+    try {
+      const t = bus.ctx.currentTime;
+      bus.eq.forEach((f: any, i: number) => {
+        const v = eqGains[i] || 0;
+        if (smooth && typeof f.gain.setTargetAtTime === 'function') {
+          f.gain.cancelScheduledValues(t);
+          f.gain.setTargetAtTime(v, t, 0.02);
+        } else {
+          f.gain.value = v;
+        }
+      });
+    } catch (e) { /* noop */ }
+  }
 
   function applyBus(bus: any, smooth: boolean): void {
     try {
@@ -72,22 +91,35 @@ export function installAudioHook(): void {
     if (!ctx || ctx.__scNoBus || !origConnect) return null;
     if (ctx.__scBus) return ctx.__scBus;
     try {
+      // input (preamp) -> EQ bands -> dry ----------------> destination
+      //                            \-> compressor -> wet -/
       const input = ctx.createGain();
       const dry = ctx.createGain();
       const wet = ctx.createGain();
       const comp = ctx.createDynamicsCompressor();
-      origConnect.call(input, dry);
-      origConnect.call(input, comp);
+      const eq = EQ_FREQS.map((freq) => {
+        const f = ctx.createBiquadFilter();
+        f.type = 'peaking';
+        f.frequency.value = freq;
+        f.Q.value = 1.4;
+        f.gain.value = 0;
+        return f;
+      });
+      let tone: any = input;
+      for (const f of eq) { origConnect.call(tone, f); tone = f; }
+      origConnect.call(tone, dry);
+      origConnect.call(tone, comp);
       origConnect.call(comp, wet);
       origConnect.call(dry, ctx.destination);
       origConnect.call(wet, ctx.destination);
-      const bus = { ctx, input, dry, wet, comp };
-      [input, dry, wet, comp].forEach((n: any) => { n.__scBusNode = true; });
+      const bus = { ctx, input, eq, tone, dry, wet, comp };
+      [input, dry, wet, comp, ...eq].forEach((n: any) => { n.__scBusNode = true; });
       ctx.__scBus = bus;
       // Forget buses of closed contexts so they can be collected.
       for (let i = buses.length - 1; i >= 0; i--) if (buses[i].ctx.state === 'closed') buses.splice(i, 1);
       buses.push(bus);
       applyBus(bus, false);
+      applyEq(bus, false);
       return bus;
     } catch (e) {
       ctx.__scNoBus = true; // never retry a context that refused
@@ -137,6 +169,16 @@ export function installAudioHook(): void {
       fxParams = next;
       buses.forEach((bus) => applyBus(bus, true));
     },
+    /** EQ band gains in dB (10 values, ±12); null or all zeros = flat. */
+    setEq(gains: any): void {
+      const next = EQ_FREQS.map((_f, i) => {
+        const v = Number(gains && gains[i]);
+        return Number.isFinite(v) ? Math.max(-12, Math.min(12, v)) : 0;
+      });
+      eqGains = next;
+      buses.forEach((bus) => applyEq(bus, true));
+    },
+    eqGains(): number[] { return eqGains.slice(); },
     status(): { buses: number; reduction: number } {
       const live = buses.filter((b) => b.ctx.state !== 'closed');
       const last = live[live.length - 1];

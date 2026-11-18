@@ -31,6 +31,7 @@ class AudioContext {
   constructor() { this.destination = new AudioDestinationNode(this); this.state = 'running'; this.currentTime = 0; }
   createGain() { return new GainNode(this); }
   createDynamicsCompressor() { return new CompressorNode(this); }
+  createBiquadFilter() { const f = new AudioNode(this); f.gain = new FakeParam(0); f.frequency = new FakeParam(350); f.Q = new FakeParam(1); return f; }
   createAnalyser() { return new AudioNode(this); }
   createMediaElementSource() { return new AudioNode(this); }
   createMediaStreamSource() { return new AudioNode(this); }
@@ -58,7 +59,10 @@ test('connections to the destination go through one bus per context', () => {
   assert.equal(trackA.edges.has(ctx.destination), false);
   assert.ok(bus.dry.edges.has(ctx.destination));
   assert.ok(bus.wet.edges.has(ctx.destination));
-  assert.ok(bus.input.edges.has(bus.comp));
+  assert.equal(bus.eq.length, 10);
+  assert.ok(bus.input.edges.has(bus.eq[0]));
+  assert.ok(bus.tone.edges.has(bus.comp));
+  assert.ok(bus.tone.edges.has(bus.dry));
 
   // SoundCloud's next track builds a fresh chain: it lands in the same bus.
   const trackB = ctx.createGain();
@@ -134,4 +138,20 @@ test('audioFx is a validated store key', () => {
 test('the page copy of audioFxParams works on its own', () => {
   const page = new Function(`${String(audioFxParams)}; return audioFxParams;`)();
   assert.deepEqual(page({ preamp: 3, mode: 'normalize' }), audioFxParams({ preamp: 3, mode: 'normalize' }));
+});
+
+test('EQ bands live in the bus and reach buses created later', () => {
+  window.__scAudioFx.setEq([12, 6, 0, 0, 0, 0, 0, 0, 0, -20]);
+  const ctx = new window.AudioContext();
+  ctx.createGain().connect(ctx.destination);
+  const bus = ctx.__scBus;
+  assert.deepEqual(bus.eq.map(f => f.gain.value), [12, 6, 0, 0, 0, 0, 0, 0, 0, -12]);
+  assert.equal(bus.eq[0].frequency.value, 32);
+  // A track chain rebuilt by SoundCloud still lands before the EQ.
+  const next = ctx.createGain();
+  next.connect(ctx.destination);
+  assert.ok(next.edges.has(bus.input));
+  window.__scAudioFx.setEq(null);
+  assert.deepEqual(bus.eq.map(f => f.gain.value), new Array(10).fill(0));
+  assert.deepEqual(window.__scAudioFx.eqGains(), new Array(10).fill(0));
 });

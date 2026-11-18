@@ -167,65 +167,29 @@ export function getEqualizerOverlayScript(): string {
       var customContainer = panel.querySelector('#sc-eq-custom-presets');
       var statusEl = panel.querySelector('#sc-eq-status');
 
-      var filters = [];
       var customPresets = {};
-      var filtersConnected = false;
 
-      function setupFilters() {
-        if (filtersConnected) return true;
-        var ctx = window.__scAudioContext;
-        var source = window.__scAudioSource;
-        var analyser = window.__scAudioAnalyser;
-        if (!ctx || !source) return false;
-
-        try {
-          try { source.disconnect(); } catch(e) {}
-          try { if (analyser) analyser.disconnect(); } catch(e) {}
-
-          filters = FREQS.map(function(freq) {
-            var filter = ctx.createBiquadFilter();
-            filter.type = 'peaking';
-            filter.frequency.value = freq;
-            filter.Q.value = 1.4;
-            filter.gain.value = 0;
-            return filter;
-          });
-
-          var chain = source;
-          filters.forEach(function(f) {
-            chain.connect(f);
-            chain = f;
-          });
-          if (analyser) {
-            chain.connect(analyser);
-            analyser.connect(ctx.destination);
-          } else {
-            chain.connect(ctx.destination);
-          }
-
-          window.__scEqFilters = filters;
-          filtersConnected = true;
-          statusEl.textContent = _t('eq.active');
-          statusEl.style.color = 'var(--sc-success)';
-          return true;
-        } catch(e) {
-          console.log('[EQ] Setup error:', e);
-          statusEl.textContent = 'Error: ' + e.message;
-          statusEl.style.color = 'var(--sc-danger)';
-          return false;
-        }
-      }
-
+      // The bands are applied inside the audio hook's master bus (audio-hook.ts),
+      // which every SoundCloud track chain flows through. Nothing here touches
+      // SoundCloud's own nodes.
+      var FLAT = [0,0,0,0,0,0,0,0,0,0];
+      function fx() { return window.__scAudioFx; }
       function applyBands(bands) {
-        if (!filters.length) return;
-        bands.forEach(function(gain, i) {
-          if (filters[i]) filters[i].gain.value = gain;
-        });
+        if (fx() && fx().setEq) fx().setEq(enabledToggle.checked ? bands : FLAT);
+        renderStatus();
       }
-
       function flattenBands() {
-        filters.forEach(function(f) { f.gain.value = 0; });
+        if (fx() && fx().setEq) fx().setEq(FLAT);
+        renderStatus();
       }
+      function renderStatus() {
+        if (!enabledToggle.checked) { statusEl.textContent = ''; return; }
+        var live = fx() && fx().status ? fx().status().buses > 0 : false;
+        statusEl.textContent = live ? _t('eq.active') : _t('eq.waiting');
+        statusEl.style.color = live ? 'var(--sc-success)' : 'var(--sc-warning)';
+      }
+      // Until something plays there is no bus; flip the status when it appears.
+      setInterval(function() { if (enabledToggle.checked && !document.hidden) renderStatus(); }, 2000);
 
       function updateSliders(bands) {
         sliders.forEach(function(s, i) { s.value = bands[i] || 0; });
@@ -250,16 +214,6 @@ export function getEqualizerOverlayScript(): string {
           api.storeSet('equalizer', state);
           saveTimer = null;
         }, 150);
-      }
-
-      function trySetup() {
-        if (!setupFilters()) {
-          statusEl.textContent = _t('eq.waiting');
-          statusEl.style.color = 'var(--sc-warning)';
-          setTimeout(trySetup, 2000);
-          return;
-        }
-        if (enabledToggle.checked) applyBands(getBands());
       }
 
       function renderCustomPresets() {
@@ -294,30 +248,26 @@ export function getEqualizerOverlayScript(): string {
         customPresets = state.customPresets || {};
         if (state.bands && state.bands.length === 10) updateSliders(state.bands);
         renderCustomPresets();
-        if (state.enabled) trySetup();
+        applyBands(getBands());
       });
 
       enabledToggle.addEventListener('change', function() {
         if (window.__scStatusSet) window.__scStatusSet('eq', enabledToggle.checked);
-        if (enabledToggle.checked) {
-          if (setupFilters()) applyBands(getBands());
-          else trySetup();
-        } else {
-          if (filtersConnected) flattenBands();
-        }
+        if (enabledToggle.checked) applyBands(getBands());
+        else flattenBands();
         saveState();
       });
 
       presetSelect.addEventListener('change', function() {
         var preset = PRESETS[presetSelect.value] || PRESETS.flat;
         updateSliders(preset);
-        if (enabledToggle.checked && filtersConnected) applyBands(preset);
+        applyBands(preset);
         saveState();
       });
 
       sliders.forEach(function(s) {
         s.addEventListener('input', function() {
-          if (enabledToggle.checked && filtersConnected) applyBands(getBands());
+          applyBands(getBands());
           saveState();
         });
       });
