@@ -537,6 +537,52 @@ html.sc-rail-compact body:not(.sc-overlay-open) > #sc-overlay-rail:not(:hover):n
   opacity: 1;
 }
 
+/* Thin separators between rail groups (player / tools / integrations /
+   appearance / settings), see NAV_ITEMS in main.ts. */
+.sc-nav-sep {
+  flex: 0 0 1px;
+  height: 1px;
+  margin: calc(3px + var(--sc-rail-gap)) 12px;
+  background: var(--sc-border);
+  border-radius: 1px;
+}
+
+/* Live status dots on rail icons (status-hub.ts). */
+.sc-nav-icon {
+  position: relative;
+}
+
+.sc-nav-dot {
+  position: absolute;
+  top: 0;
+  left: calc(50% + var(--sc-icon-size) / 2 - 4px);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sc-accent);
+  box-shadow: 0 0 0 2px rgba(24, 25, 29, 0.92);
+  pointer-events: none;
+}
+
+.sc-nav-dot-ok { background: var(--sc-success); }
+.sc-nav-dot-warn { background: var(--sc-warning); }
+.sc-nav-dot-busy { animation: scNavDotPulse 1.4s ease-in-out infinite; }
+
+@keyframes scNavDotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
+}
+
+html.sc-power-saver .sc-nav-dot-busy {
+  animation: none;
+}
+
+@media (max-height: 620px) {
+  .sc-nav-sep {
+    margin: 2px 12px;
+  }
+}
+
 .sc-overlay-nav::-webkit-scrollbar {
   width: 4px;
 }

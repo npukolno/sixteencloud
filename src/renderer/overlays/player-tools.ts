@@ -85,7 +85,7 @@ export function getPlayerToolsOverlayHTML(): string {
 
 export function getPlayerToolsOverlayScript(): string {
   const _tr = JSON.stringify(getScriptTranslations([
-    'player.sleep_off', 'player.sleep_in', 'player.sleep_track', 'player.lb_ok', 'player.lb_bad', 'player.lb_none', 'player.lb_checking',
+    'player.sleep_off', 'player.sleep_in', 'player.sleep_track', 'player.sleep_toast', 'player.lb_ok', 'player.lb_bad', 'player.lb_none', 'player.lb_checking',
   ]));
   return `
     (function() {
@@ -174,6 +174,10 @@ export function getPlayerToolsOverlayScript(): string {
         else if (sleepEnd) sleepStatus.textContent = _t('player.sleep_in').replace('{time}', fmt(sleepEnd - Date.now()));
         else sleepStatus.textContent = _t('player.sleep_off');
         sleepCancel.style.display = (sleepEnd || sleepTrack) ? '' : 'none';
+        var st = window.__scStatus && window.__scStatus.sleep;
+        if (window.__scStatusSet && (!st || st.end !== sleepEnd || st.track !== sleepTrack)) {
+          window.__scStatusSet('sleep', { end: sleepEnd, track: sleepTrack });
+        }
       }
       function sleepClear() {
         sleepEnd = 0; sleepTrack = false;
@@ -209,6 +213,9 @@ export function getPlayerToolsOverlayScript(): string {
         if (m === 'track') sleepTrack = true;
         else { sleepEnd = Date.now() + Number(m) * 60000; b.setAttribute('data-on', '1'); }
         sleepUi();
+        if (window.__scToast) {
+          window.__scToast(m === 'track' ? _t('player.sleep_track') : _t('player.sleep_toast').replace('{min}', String(Number(m))));
+        }
       });
       sleepCancel.addEventListener('click', sleepClear);
       setInterval(function() {

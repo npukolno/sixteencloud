@@ -221,6 +221,7 @@ export function getEqualizerOverlayScript(): string {
       });
 
       enabledToggle.addEventListener('change', function() {
+        if (window.__scStatusSet) window.__scStatusSet('eq', enabledToggle.checked);
         if (enabledToggle.checked) {
           if (setupFilters()) applyBands(getBands());
           else trySetup();
