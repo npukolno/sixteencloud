@@ -158,19 +158,33 @@ body {
 }
 
 /* Backdrop */
+/* The blur radius is constant and only the opacity animates. Animating the
+   radius (0 -> 8px) makes Chromium re-run the filter with a new kernel on
+   every frame, which showed up as the background jittering while opening. */
 .sc-overlay-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0);
-  backdrop-filter: blur(0px);
-  -webkit-backdrop-filter: blur(0px);
-  transition: background-color 0.25s ease, backdrop-filter 0.25s ease;
-}
-
-#sc-overlay-container.open .sc-overlay-backdrop {
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  opacity: 0;
+  will-change: opacity;
+  transition: opacity 0.22s ease;
+}
+
+#sc-overlay-container.open .sc-overlay-backdrop {
+  opacity: 1;
+}
+
+/* The visualizer layers repaint every frame while music plays. They sit
+   directly under the blurred backdrop, so the compositor would re-blur a
+   changing surface each frame. They are dimmed out of sight anyway. */
+body.sc-overlay-open #sc-visualizer-canvas,
+body.sc-overlay-open #sc-visualizer-wave,
+body.sc-overlay-open #sc-visualizer-glow,
+body.sc-overlay-open #sc-visualizer-ambient,
+body.sc-overlay-open #sc-visualizer-spectrogram {
+  visibility: hidden;
 }
 
 /* Main Window — macOS-style sheet */

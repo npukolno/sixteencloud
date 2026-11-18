@@ -75,7 +75,7 @@ export function getDownloaderOverlayHTML(): string {
         <button class="sc-overlay-btn sc-overlay-btn-secondary sc-overlay-btn-full" id="sc-dl-set-dir">
           ${t('downloader.choose_folder')}
         </button>
-        <div style="font-size: 12px; color: var(--sc-text-muted); margin-top: 6px;" id="sc-dl-dir-display">~/Music/SixteenCloud/</div>
+        <div style="font-size: 12px; color: var(--sc-text-muted); margin-top: 6px;" id="sc-dl-dir-display">…</div>
       </div>
 
       <!-- Queue section -->
@@ -152,8 +152,11 @@ export function getDownloaderOverlayScript(): string {
       api.storeGet('downloader').then(function(state) {
         if (!state) return;
         qualitySelect.value = state.quality || '128';
-        if (state.outputDir) dirDisplay.textContent = state.outputDir;
         renderHistory(state.history || []);
+      });
+      // Always show the folder downloads really go to (it follows the system Music folder).
+      api.downloadGetDir().then(function(dir) {
+        if (dir) dirDisplay.textContent = dir;
       });
 
       // Detect current track. Only the pathname is authoritative: a track
@@ -389,6 +392,7 @@ export function getDownloaderOverlayScript(): string {
             : p.status === 'converting' ? _t('downloader.converting')
             : p.status === 'tagging' ? _t('downloader.tagging')
             : p.status === 'zipping' ? _t('downloader.zipping')
+            : p.status === 'error' ? _t('downloader.error', {error: p.error || ''})
             : p.status;
           // Tracks download in parallel, so count finished ones, not the index.
           var done = typeof p.playlistCompleted === 'number' ? p.playlistCompleted : p.playlistIndex;
@@ -421,7 +425,8 @@ export function getDownloaderOverlayScript(): string {
           playlistBar.style.width = '100%';
           playlistPercent.textContent = '100%';
           playlistTrackBar.style.width = '100%';
-          playlistStatus.textContent = _t('downloader.playlist_complete', {count: '' + result.total});
+          playlistStatus.textContent = _t('downloader.playlist_complete', {count: '' + result.total})
+            + (result.failed ? ' (' + result.failed + ' failed: ' + result.firstError + ')' : '');
           playlistTrackName.textContent = '';
           api.storeGet('downloader.history').then(function(h) { renderHistory(h || []); });
           try { new Notification('SixteenCloud', { body: _t('downloader.playlist_complete', {count: '' + result.total}) }); } catch(e) {}
@@ -435,7 +440,7 @@ export function getDownloaderOverlayScript(): string {
           singleBar.style.width = '100%';
           singlePercent.textContent = '100%';
           singleStage.style.color = '#4f4';
-          singleStage.textContent = _t('downloader.downloaded');
+          singleStage.textContent = _t('downloader.downloaded') + (result.filePath ? ' — ' + result.filePath : '');
           var trackName = currentTrack ? (currentTrack.title + ' — ' + currentTrack.artist) : '';
           try { new Notification('SixteenCloud', { body: _t('downloader.downloaded') + (trackName ? ' ' + trackName : '') }); } catch(e) {}
         }
@@ -491,9 +496,11 @@ export function getDownloaderOverlayScript(): string {
           var statusClass = item.status === 'downloading' ? 'downloading' : item.status === 'done' ? 'done' : item.status === 'error' ? 'error' : 'pending';
           var statusIcon = '<span class="sc-queue-status ' + statusClass + '" aria-hidden="true"></span>';
           var removeBtn = (item.status === 'pending') ? ' <button class="sc-queue-remove sc-overlay-btn-icon" data-id="' + window.__scEscapeHtml(item.trackId) + '" title="Remove" aria-label="Remove">&times;</button>' : '';
+          var errLine = (item.status === 'error' && item.error)
+            ? '<div style="color:var(--sc-danger);margin-top:2px;">' + window.__scEscapeHtml(item.error) + '</div>' : '';
           return '<li class="sc-overlay-list-item" style="font-size:12px;display:flex;align-items:center;justify-content:space-between;"><div>' +
             statusIcon + ' ' + window.__scEscapeHtml(item.title || '') + ' — ' + window.__scEscapeHtml(item.artist || '') +
-            '</div>' + removeBtn + '</li>';
+            errLine + '</div>' + removeBtn + '</li>';
         }).join('');
         // Bind remove buttons
         queueList.querySelectorAll('.sc-queue-remove').forEach(function(el) {

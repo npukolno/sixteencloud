@@ -84,6 +84,8 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADER_RESOLVE, trackUrl),
   downloadSetDir: (): Promise<string> =>
     ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_SET_DIR),
+  downloadGetDir: (): Promise<string> =>
+    ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_GET_DIR),
   onDownloadProgress: (callback: (progress: unknown) => void): Unsubscribe =>
     subscribe<unknown>(IPC_CHANNELS.DOWNLOAD_PROGRESS, callback),
   onDownloadComplete: (callback: (result: unknown) => void): Unsubscribe =>

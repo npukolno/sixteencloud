@@ -1,6 +1,6 @@
 import { SOUNDCLOUD_API_V2 } from '../../shared/constants';
 import { isAllowedMediaUrl, isTrustedSoundCloudUrl } from '../../shared/security';
-import { logInfo } from '../logger';
+import { logInfo, logWarn } from '../logger';
 import { eFetch } from './net';
 import { getSecret } from './store';
 
@@ -57,12 +57,17 @@ export function authHeaders(token: string): Record<string, string> {
  * id; a 401/403 drops the cached one, scrapes a fresh one and retries once.
  */
 export async function scApiFetch(buildUrl: (clientId: string) => string, token = storedOAuthToken()): Promise<Response> {
-  const headers = authHeaders(token);
-  let resp = await eFetch(buildUrl(await getClientId()), { headers });
+  const call = async (tok: string) => eFetch(buildUrl(await getClientId()), { headers: authHeaders(tok) });
+  let resp = await call(token);
   if (resp.status === 401 || resp.status === 403) {
     logInfo(`[SoundCloud] API answered ${resp.status}, refreshing client_id...`);
     cachedClientId = null;
-    resp = await eFetch(buildUrl(await getClientId()), { headers });
+    resp = await call(token);
+    if (token && (resp.status === 401 || resp.status === 403)) {
+      // A stale or revoked token makes SoundCloud reject even public tracks.
+      logWarn(`[SoundCloud] OAuth token rejected (${resp.status}), retrying anonymously`);
+      resp = await call('');
+    }
   }
   return resp;
 }

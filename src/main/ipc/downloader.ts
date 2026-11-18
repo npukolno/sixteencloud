@@ -40,8 +40,13 @@ function resolveFfmpegPath(): string {
   return 'ffmpeg'; // let the spawn resolve it through PATH
 }
 
+/** The folder downloads really go to: the chosen one, else <system Music folder>/SixteenCloud. */
+function resolveOutputDir(): string {
+  return (getStore().get('downloader.outputDir') || path.join(app.getPath('music'), 'SixteenCloud')) as string;
+}
+
 function defaultOutputDir(): string {
-  const dir = (getStore().get('downloader.outputDir') || path.join(app.getPath('music'), 'SixteenCloud')) as string;
+  const dir = resolveOutputDir();
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -244,14 +249,14 @@ export function setupDownloaderIPC(mainWindow: BrowserWindow): void {
   });
 
   // --- Queue -----------------------------------------------------------------
-  interface QueueItem { request: DownloadRequest; status: 'pending' | 'downloading' | 'paused' | 'done' | 'error' }
+  interface QueueItem { request: DownloadRequest; status: 'pending' | 'downloading' | 'paused' | 'done' | 'error'; error?: string }
   const downloadQueue: QueueItem[] = [];
   let queuePaused = false;
   let queueProcessing = false;
 
   function sendQueueState(): void {
     safeSend(mainWindow, IPC_CHANNELS.DOWNLOAD_QUEUE_STATE, {
-      items: downloadQueue.map(q => ({ trackId: q.request.trackId, title: q.request.title, artist: q.request.artist, status: q.status })),
+      items: downloadQueue.map(q => ({ trackId: q.request.trackId, title: q.request.title, artist: q.request.artist, status: q.status, error: q.error })),
       paused: queuePaused,
     });
   }
@@ -275,6 +280,7 @@ export function setupDownloaderIPC(mainWindow: BrowserWindow): void {
     } catch (err) {
       logWarn(`[Downloader] Queue item failed: ${err}`);
       next.status = 'error';
+      next.error = String((err as Error)?.message || err);
     }
     queueProcessing = false;
     sendQueueState();
@@ -347,14 +353,21 @@ export function setupDownloaderIPC(mainWindow: BrowserWindow): void {
     if (added > 0) void processQueue();
   });
 
+  ipcMain.handle(IPC_CHANNELS.DOWNLOAD_GET_DIR, (event) => {
+    assertMainRenderer(event, mainWindow);
+    return resolveOutputDir();
+  });
+
   ipcMain.handle(IPC_CHANNELS.DOWNLOAD_SET_DIR, async (event) => {
     assertMainRenderer(event, mainWindow);
-    const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'], title: 'Select download directory' });
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory'], title: 'Select download directory', defaultPath: resolveOutputDir(),
+    });
     if (!result.canceled && result.filePaths.length > 0) {
       store.set('downloader.outputDir', result.filePaths[0]);
       return result.filePaths[0];
     }
-    return store.get('downloader.outputDir');
+    return resolveOutputDir();
   });
 
   // --- Playlist → zip ----------------------------------------------------------
@@ -461,6 +474,7 @@ export function setupDownloaderIPC(mainWindow: BrowserWindow): void {
       const names = uniqueNames(requests.map(r => safeFileName(`${r.artist} - ${r.title}`)));
       const results: Array<string | null> = new Array(tracks.length).fill(null);
       let completed = 0;
+      const failures: string[] = [];
 
       const progress = (i: number, percent: number, status: string, extra: Record<string, unknown> = {}) => {
         safeSend(mainWindow, IPC_CHANNELS.DOWNLOAD_PROGRESS, {
@@ -486,11 +500,15 @@ export function setupDownloaderIPC(mainWindow: BrowserWindow): void {
         } catch (err) {
           completed++;
           logInfo(`[Playlist] Track ${i + 1}/${tracks.length} error: ${err}`);
-          progress(i, 0, 'error', { error: String(err) });
+          failures.push(`${requests[i].title}: ${String((err as Error)?.message || err)}`);
+          progress(i, 0, 'error', { error: String((err as Error)?.message || err) });
         }
       });
 
       const files = results.filter((f): f is string => !!f && fs.existsSync(f));
+      if (files.length === 0) {
+        throw new Error(`All ${tracks.length} tracks failed. First error: ${failures[0] || 'unknown'}`);
+      }
       if (files.length > 0) {
         const zipPath = path.join(outputDir, playlistName + '.zip');
         logInfo(`[Playlist] Creating zip: ${zipPath} (${files.length} files)`);
@@ -512,7 +530,7 @@ export function setupDownloaderIPC(mainWindow: BrowserWindow): void {
       }
 
       logInfo(`[Playlist] All done! ${files.length}/${tracks.length} tracks`);
-      safeSend(mainWindow, IPC_CHANNELS.DOWNLOAD_COMPLETE, { playlistDone: true, total: files.length });
+      safeSend(mainWindow, IPC_CHANNELS.DOWNLOAD_COMPLETE, { playlistDone: true, total: files.length, failed: failures.length, firstError: failures[0] || '' });
     } catch (err) {
       logInfo(`[Playlist] Fatal error: ${err}`);
       safeSend(mainWindow, IPC_CHANNELS.DOWNLOAD_COMPLETE, { error: String(err) });

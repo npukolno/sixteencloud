@@ -262,6 +262,7 @@ export const IPC_CHANNELS = {
   DOWNLOAD_PROGRESS: 'download:progress',
   DOWNLOAD_COMPLETE: 'download:complete',
   DOWNLOAD_SET_DIR: 'download:set-dir',
+  DOWNLOAD_GET_DIR: 'download:get-dir',
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
   SETTINGS_CLEAR_CACHE: 'settings:clear-cache',
