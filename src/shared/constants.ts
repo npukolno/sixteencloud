@@ -196,6 +196,8 @@ export const STORE_DEFAULTS = {
     notifications: false,
     scrobble: false,
     speed: 1,
+    seekStep: 10,
+    reposts: 'show' as 'show' | 'collapse' | 'hide',
   },
   searchHistory: [] as string[],
   wave: {
@@ -220,6 +222,10 @@ export const STORE_DEFAULTS = {
     preset: 'flat',
     bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     customPresets: {} as Record<string, number[]>,
+  },
+  audioFx: {
+    preamp: 0,
+    mode: 'off' as 'off' | 'limiter' | 'normalize',
   },
   visualizer: {
     enabled: true,
@@ -269,6 +275,8 @@ export const IPC_CHANNELS = {
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
   SETTINGS_CLEAR_CACHE: 'settings:clear-cache',
+  SETTINGS_EXPORT: 'settings:export',
+  SETTINGS_IMPORT: 'settings:import',
   TRACK_INFO: 'track:info',
   WINDOW_MINIMIZE: 'window:minimize',
   WINDOW_MAXIMIZE: 'window:maximize',
@@ -302,6 +310,7 @@ export const IPC_CHANNELS = {
   OFFLINE_CACHE_LIST: 'offline:list',
   OFFLINE_CACHE_CLEAR: 'offline:clear',
   OFFLINE_CACHE_STATUS: 'offline:status',
+  OFFLINE_CACHE_URL: 'offline:cache-url',
   MINI_PLAYER_TOGGLE: 'mini:toggle',
   MINI_PLAYER_UPDATE: 'mini:update',
 } as const;

@@ -87,6 +87,18 @@ export function getSettingsOverlayHTML(): string {
             <button class="sc-overlay-badge sc-keybind-btn" type="button" data-action="miniPlayer"></button>
           </div>
           <div class="sc-overlay-list-item">
+            <span class="sc-overlay-list-item-title">${t('settings.kb_seek_back')}</span>
+            <button class="sc-overlay-badge sc-keybind-btn" type="button" data-action="seekBack"></button>
+          </div>
+          <div class="sc-overlay-list-item">
+            <span class="sc-overlay-list-item-title">${t('settings.kb_seek_forward')}</span>
+            <button class="sc-overlay-badge sc-keybind-btn" type="button" data-action="seekForward"></button>
+          </div>
+          <div class="sc-overlay-list-item">
+            <span class="sc-overlay-list-item-title">${t('settings.kb_loop_ab')}</span>
+            <button class="sc-overlay-badge sc-keybind-btn" type="button" data-action="loopAB"></button>
+          </div>
+          <div class="sc-overlay-list-item">
             <span class="sc-overlay-list-item-title">${t('settings.close_panel')}</span>
             <span class="sc-overlay-badge">Esc</span>
           </div>
@@ -146,6 +158,17 @@ export function getSettingsOverlayHTML(): string {
       </div>
 
       <div class="sc-overlay-toggle" style="margin-top: 16px;">
+        <div>
+          <span class="sc-overlay-toggle-label">${t('settings.ambient')}</span>
+          <div style="font-size:11px;opacity:.6;margin-top:2px;">${t('settings.ambient_desc')}</div>
+        </div>
+        <label class="sc-overlay-switch">
+          <input type="checkbox" id="sc-set-ambient" checked>
+          <span class="sc-overlay-switch-slider"></span>
+        </label>
+      </div>
+
+      <div class="sc-overlay-toggle" style="margin-top: 16px;">
         <span class="sc-overlay-toggle-label">${t('settings.auto_update')}</span>
         <label class="sc-overlay-switch">
           <input type="checkbox" id="sc-set-autoupdate" checked>
@@ -162,6 +185,16 @@ export function getSettingsOverlayHTML(): string {
         <div id="sc-set-update-progress" style="display:none;margin-top:6px;width:100%;height:6px;background:var(--sc-surface-raised);border-radius:3px;overflow:hidden;">
           <div id="sc-set-update-progress-fill" style="height:100%;width:0%;background:var(--sc-accent);border-radius:3px;transition:width 0.3s;"></div>
         </div>
+      </div>
+
+      <div class="sc-overlay-group" style="margin-top: 20px;">
+        <span class="sc-overlay-label">${t('settings.profile')}</span>
+        <div style="font-size:11px;opacity:.6;margin:2px 0 8px;">${t('settings.profile_desc')}</div>
+        <div style="display:flex;gap:8px;">
+          <button class="sc-overlay-btn sc-overlay-btn-secondary" id="sc-set-profile-export" style="flex:1;">${t('settings.profile_export')}</button>
+          <button class="sc-overlay-btn sc-overlay-btn-secondary" id="sc-set-profile-import" style="flex:1;">${t('settings.profile_import')}</button>
+        </div>
+        <div id="sc-set-profile-status" style="font-size:12px;color:var(--sc-text-muted);margin-top:6px;min-height:16px;"></div>
       </div>
 
       <div class="sc-overlay-group" style="margin-top: 20px;">
@@ -189,6 +222,7 @@ export function getSettingsOverlayScript(): string {
     'settings.check_failed', 'settings.clearing', 'settings.cache_cleared',
     'settings.clear_cache', 'settings.reset_confirm',
     'settings.download_update', 'settings.downloading_update', 'settings.restart_to_update',
+    'settings.profile_exported', 'settings.profile_imported', 'settings.profile_failed',
     'common.yes', 'common.no',
   ]));
   const _appVersion = app.getVersion();
@@ -229,6 +263,7 @@ export function getSettingsOverlayScript(): string {
       const visualizerTypeItems = panel.querySelectorAll('.sc-custom-dropdown-item');
       const autoUpdate = panel.querySelector('#sc-set-autoupdate');
       const batterySaver = panel.querySelector('#sc-set-battery-saver');
+      const ambient = panel.querySelector('#sc-set-ambient');
       const lyricsRing = panel.querySelector('#sc-set-viz-lyrics-ring');
       const checkUpdateBtn = panel.querySelector('#sc-set-check-update');
       const updateStatus = panel.querySelector('#sc-set-update-status');
@@ -333,6 +368,7 @@ export function getSettingsOverlayScript(): string {
         if (!dynAccent.checked) window.scApplyAccent(_hsvToHex(_hsv.h, _hsv.s, _hsv.v));
         autoUpdate.checked = s.autoUpdate !== false;
         batterySaver.checked = s.batterySaver !== false;
+        ambient.checked = s.ambient !== false;
       });
 
       dynAccent.addEventListener('change', function() {
@@ -490,6 +526,11 @@ export function getSettingsOverlayScript(): string {
         api.storeSet('settings.batterySaver', batterySaver.checked);
       });
 
+      ambient.addEventListener('change', function() {
+        api.storeSet('settings.ambient', ambient.checked);
+        if (window.__scAmbient) window.__scAmbient.set(ambient.checked);
+      });
+
       var downloadBtn = panel.querySelector('#sc-set-download-update');
       var progressWrap = panel.querySelector('#sc-set-update-progress');
       var progressFill = panel.querySelector('#sc-set-update-progress-fill');
@@ -625,6 +666,36 @@ export function getSettingsOverlayScript(): string {
         renderKeybinds();
       });
 
+      // ---- Settings profile (export / import as one JSON file) ----
+      var profileStatus = panel.querySelector('#sc-set-profile-status');
+      var profileExport = panel.querySelector('#sc-set-profile-export');
+      var profileImport = panel.querySelector('#sc-set-profile-import');
+      function profileSay(text, kind) {
+        profileStatus.textContent = text;
+        profileStatus.style.color = kind === 'error' ? 'var(--sc-danger)' : kind === 'success' ? 'var(--sc-success)' : 'var(--sc-text-muted)';
+        if (window.__scToast && text) window.__scToast(text, { kind: kind });
+      }
+      profileExport.addEventListener('click', function() {
+        if (typeof api.settingsExport !== 'function') return;
+        profileExport.disabled = true;
+        api.settingsExport().then(function(r) {
+          if (r && !r.canceled) profileSay(_t('settings.profile_exported', { count: String(r.count || 0) }), 'success');
+        }).catch(function() { profileSay(_t('settings.profile_failed'), 'error'); })
+          .then(function() { profileExport.disabled = false; });
+      });
+      profileImport.addEventListener('click', function() {
+        if (typeof api.settingsImport !== 'function') return;
+        profileImport.disabled = true;
+        api.settingsImport().then(function(r) {
+          if (!r || r.canceled) return;
+          if (r.error) { profileSay(_t('settings.profile_failed') + ': ' + r.error, 'error'); return; }
+          profileSay(_t('settings.profile_imported', { count: String(r.applied || 0), skipped: String(r.skipped || 0) }), 'success');
+          // Themes, CSS, EQ and the rest are read at page start: reload once.
+          setTimeout(function() { window.location.reload(); }, 1200);
+        }).catch(function() { profileSay(_t('settings.profile_failed'), 'error'); })
+          .then(function() { profileImport.disabled = false; });
+      });
+
       clearCache.addEventListener('click', function() {
         clearCache.disabled = true;
         clearCache.textContent = _t('settings.clearing');
@@ -643,7 +714,7 @@ export function getSettingsOverlayScript(): string {
         var box = document.createElement('div');
         box.id = 'sc-confirm-reset';
         box.style.cssText = 'margin-top:8px;padding:10px;background:var(--sc-danger-soft);border:1px solid var(--sc-danger);border-radius:6px;display:flex;align-items:center;justify-content:space-between;';
-        box.innerHTML = '<span style="color:var(--sc-danger);font-size:12px;">' + _t('settings.reset_confirm') + '</span><div style="display:flex;gap:6px;"><button id="sc-confirm-yes" style="background:var(--sc-danger);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">' + _t('common.yes') + '</button><button id="sc-confirm-no" style="background:var(--sc-surface-raised);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">' + _t('common.no') + '</button></div>';
+        box.innerHTML = '<span style="color:var(--sc-danger);font-size:12px;">' + _t('settings.reset_confirm') + '</span><div style="display:flex;gap:6px;"><button id="sc-confirm-yes" style="background:var(--sc-danger);color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">' + _t('common.yes') + '</button><button id="sc-confirm-no" style="background:var(--sc-surface-raised);color:var(--sc-text);border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">' + _t('common.no') + '</button></div>';
         resetAll.parentNode.insertBefore(box, resetAll.nextSibling);
         box.querySelector('#sc-confirm-yes').onclick = function() {
           api.storeSet('settings', { startMinimized: false, launchOnStartup: false, accentColor: '#ff5500', autoUpdate: true, keybinds: {} }).then(function() {

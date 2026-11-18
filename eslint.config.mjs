@@ -36,4 +36,9 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node } },
     rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
+  {
+    // Tests run page hooks against stubbed window / XMLHttpRequest globals.
+    files: ['test/**/*.mjs'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
 );

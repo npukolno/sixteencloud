@@ -9,6 +9,9 @@ export const SC = {
   PREV: '.skipControl__previous, .playControls__prev',
   PLAYER_BAR: '.playControls',
   TITLE_LINK: '.playbackSoundBadge__titleLink',
+  /** Slot that holds the cover/title badge inside .playControls__elements. */
+  SOUND_BADGE_SLOT: '.playControls__soundBadge',
+  PLAYER_ELEMENTS: '.playControls__elements',
   ARTIST_LINK: '.playbackSoundBadge__lightLink',
   /** Like button next to the playing track (has `.sc-button-selected` when liked). */
   LIKE: '.playbackSoundBadge__like',
@@ -18,6 +21,16 @@ export const SC = {
   TIMELINE_WRAPPER: '.playbackTimeline__progressWrapper',
   TIMELINE_DURATION: '.playbackTimeline__duration span[aria-hidden]',
   MAIN_CONTENT: '.l-main',
+  /** Big play button on a track/playlist page, and that page's cover. */
+  HERO_PLAY: '.fullHero__foreground .playButton, .fullListenHero .playButton, .listenHero .playButton',
+  PAGE_ARTWORK: '.fullHero__artwork .image__full, .listenArtworkWrapper .image__full, .profileHeaderInfo__avatar .image__full, .profileHeader__avatar .image__full',
+  /** Next up (play queue): toggle in the player badge, the panel and one row. */
+  QUEUE_TOGGLE: '.playbackSoundBadge__showQueue, .playControls__queue button',
+  QUEUE_PANEL: '.queue',
+  QUEUE_ITEM: '.queueItemView, .queue__itemWrapper',
+  /** One entry of the home feed and its title link (href = track/playlist path). */
+  FEED_ITEM: '.soundList__item',
+  FEED_ITEM_TITLE: 'a.soundTitle__title',
   HYDRATION: '#__sc_hydration',
 } as const;
 

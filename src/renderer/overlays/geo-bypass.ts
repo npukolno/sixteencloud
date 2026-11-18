@@ -98,6 +98,7 @@ export function getGeoBypassOverlayScript(): string {
       });
 
       function updateStatus(enabled, proxyUrl, country) {
+        if (window.__scStatusSet) window.__scStatusSet('geo', { enabled: !!enabled, proxy: !!proxyUrl, country: String(country || '') });
         if (!enabled) {
           statusDot.className = 'sc-overlay-status-dot gray';
           statusText.textContent = _t('geo.disabled');

@@ -101,6 +101,12 @@ const api = {
   // Settings
   settingsClearCache: (): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_CLEAR_CACHE),
+  /** Save every customisable setting to a JSON file (native save dialog, no secrets). */
+  settingsExport: (): Promise<{ canceled: boolean; count?: number }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_EXPORT),
+  /** Load a settings JSON file (native open dialog); every key is validated in main. */
+  settingsImport: (): Promise<{ canceled: boolean; applied?: number; skipped?: number; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_IMPORT),
 
   // Window controls
   windowMinimize: (): void => ipcRenderer.send(IPC_CHANNELS.WINDOW_MINIMIZE),
@@ -183,6 +189,9 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.OFFLINE_CACHE_CLEAR),
   offlineCacheStatus: (): Promise<unknown> =>
     ipcRenderer.invoke(IPC_CHANNELS.OFFLINE_CACHE_STATUS),
+  /** Resolve and cache a track page URL (the main process finds the stream). */
+  offlineCacheUrl: (request: { trackUrl: string; title?: string; artist?: string; artworkUrl?: string; duration?: number }): Promise<{ success: boolean; message?: string; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.OFFLINE_CACHE_URL, request),
 
   // Mini-player
   miniPlayerToggle: (): void =>

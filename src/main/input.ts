@@ -1,6 +1,6 @@
 import { globalShortcut, type BrowserWindow } from 'electron';
 import { IPC_CHANNELS } from '../shared/constants';
-import { matchesCombo, resolveKeybinds, type KeybindAction } from '../shared/keybinds';
+import { matchesCombo, resolveKeybinds, PAGE_KEYBIND_ACTIONS, type KeybindAction } from '../shared/keybinds';
 import { clickScript, pauseScript, scJs } from '../shared/sc-selectors';
 import { getStore } from './ipc';
 import { logWarn } from './logger';
@@ -71,6 +71,11 @@ export function registerKeybinds(win: BrowserWindow, actions: { toggleMiniPlayer
     } else if (match('miniPlayer')) {
       event.preventDefault();
       actions.toggleMiniPlayer();
+    } else if (PAGE_KEYBIND_ACTIONS.some(match)) {
+      // Seek steps and the A-B loop live in the page (player-tools.ts).
+      event.preventDefault();
+      const pageAction = PAGE_KEYBIND_ACTIONS.find(match)!;
+      run(win, `window.__scKeyAction && window.__scKeyAction(${JSON.stringify(pageAction)})`, 'key action');
     } else if (match('volumeUp')) {
       event.preventDefault();
       run(win, 'window.__scVolumeStep && window.__scVolumeStep(0.05)', 'volume step');

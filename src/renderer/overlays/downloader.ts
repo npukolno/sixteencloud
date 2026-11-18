@@ -41,6 +41,9 @@ export function getDownloaderOverlayHTML(): string {
       <button class="sc-overlay-btn sc-overlay-btn-secondary sc-overlay-btn-full" id="sc-dl-liked-btn" style="margin-top: 8px;">
         ${t('downloader.download_liked')}
       </button>
+      <button class="sc-overlay-btn sc-overlay-btn-secondary sc-overlay-btn-full" id="sc-dl-queue-export" style="margin-top: 8px;">
+        ${t('downloader.export_queue')}
+      </button>
 
       <!-- Single track progress -->
       <div id="sc-dl-single-progress" style="display: none; margin-top: 12px;">
@@ -498,6 +501,14 @@ export function getDownloaderOverlayScript(): string {
             api.downloadQueueRemove(el.dataset.id);
           });
         });
+      });
+
+      // === Play queue (Next up) -> download queue, see queue-export.ts ===
+      var queueExportBtn = panel.querySelector('#sc-dl-queue-export');
+      queueExportBtn.addEventListener('click', function() {
+        if (typeof window.__scExportQueue !== 'function') return;
+        queueExportBtn.disabled = true;
+        window.__scExportQueue().catch(function() {}).then(function() { queueExportBtn.disabled = false; });
       });
 
       // === Liked tracks ===

@@ -15,6 +15,9 @@
 //
 // Analyser подключается как tap: source → analyser → gain(0) → destination.
 // Немой gain держит analyser обрабатываемым и не дублирует звук.
+//
+// Master bus (window.__scAudioFx): every connection to a destination goes
+// through preamp -> limiter, so it survives SoundCloud's per-track rebuild.
 
 export function installAudioHook(): void {
   'use strict';
@@ -29,6 +32,116 @@ export function installAudioHook(): void {
   const origCreateMediaElementSource = proto.createMediaElementSource;
   if (typeof origCreateMediaElementSource !== 'function') return;
 
+  // ---- Master bus: preamp -> (dry | limiter) -> destination -----------------
+  // SoundCloud rebuilds its graph for every track, so a node inserted once
+  // is gone with the next source. Instead, every connection to a context's
+  // destination is redirected into one bus per context, created on first
+  // use; whatever SoundCloud builds next lands in the same bus. Until the EQ
+  // panel pushes settings the bus is transparent (unity gain, dry path only).
+  const NodeProto: any = w.AudioNode && w.AudioNode.prototype;
+  const DestinationNode: any = w.AudioDestinationNode;
+  const origConnect = NodeProto && NodeProto.connect;
+  const origDisconnect = NodeProto && NodeProto.disconnect;
+  const buses: any[] = [];
+  let fxParams: any = { gain: 1, dry: 1, wet: 0, threshold: -24, knee: 30, ratio: 12, attack: 0.003, release: 0.25 };
+
+  function applyBus(bus: any, smooth: boolean): void {
+    try {
+      const t = bus.ctx.currentTime;
+      const set = (param: any, value: number) => {
+        if (!param || !Number.isFinite(value)) return;
+        if (smooth && typeof param.setTargetAtTime === 'function') {
+          param.cancelScheduledValues(t);
+          param.setTargetAtTime(value, t, 0.03);
+        } else {
+          param.value = value;
+        }
+      };
+      set(bus.input.gain, fxParams.gain);
+      set(bus.dry.gain, fxParams.dry);
+      set(bus.wet.gain, fxParams.wet);
+      bus.comp.threshold.value = fxParams.threshold;
+      bus.comp.knee.value = fxParams.knee;
+      bus.comp.ratio.value = fxParams.ratio;
+      bus.comp.attack.value = fxParams.attack;
+      bus.comp.release.value = fxParams.release;
+    } catch (e) { /* noop */ }
+  }
+
+  function busFor(ctx: any): any {
+    if (!ctx || ctx.__scNoBus || !origConnect) return null;
+    if (ctx.__scBus) return ctx.__scBus;
+    try {
+      const input = ctx.createGain();
+      const dry = ctx.createGain();
+      const wet = ctx.createGain();
+      const comp = ctx.createDynamicsCompressor();
+      origConnect.call(input, dry);
+      origConnect.call(input, comp);
+      origConnect.call(comp, wet);
+      origConnect.call(dry, ctx.destination);
+      origConnect.call(wet, ctx.destination);
+      const bus = { ctx, input, dry, wet, comp };
+      [input, dry, wet, comp].forEach((n: any) => { n.__scBusNode = true; });
+      ctx.__scBus = bus;
+      // Forget buses of closed contexts so they can be collected.
+      for (let i = buses.length - 1; i >= 0; i--) if (buses[i].ctx.state === 'closed') buses.splice(i, 1);
+      buses.push(bus);
+      applyBus(bus, false);
+      return bus;
+    } catch (e) {
+      ctx.__scNoBus = true; // never retry a context that refused
+      return null;
+    }
+  }
+
+  function isDestination(node: any): boolean {
+    return !!node && (DestinationNode ? node instanceof DestinationNode : node === (node.context && node.context.destination));
+  }
+
+  if (origConnect && origDisconnect) {
+    NodeProto.connect = function (this: any, dest: any) {
+      if (!this.__scBusNode && isDestination(dest)) {
+        const bus = busFor(dest.context);
+        if (bus) {
+          const args = Array.prototype.slice.call(arguments);
+          args[0] = bus.input;
+          return origConnect.apply(this, args);
+        }
+      }
+      return origConnect.apply(this, arguments as any);
+    };
+    NodeProto.disconnect = function (this: any, dest: any) {
+      if (!this.__scBusNode && isDestination(dest) && dest.context && dest.context.__scBus) {
+        const args = Array.prototype.slice.call(arguments);
+        args[0] = dest.context.__scBus.input;
+        try { return origDisconnect.apply(this, args); } catch (e) { /* fall through */ }
+      }
+      return origDisconnect.apply(this, arguments as any);
+    };
+  }
+
+  w.__scAudioFx = {
+    /** Push new bus settings (numbers from shared/audio-fx.ts audioFxParams). */
+    set(params: any): void {
+      if (!params || typeof params !== 'object') return;
+      const next: any = {};
+      for (const k of ['gain', 'dry', 'wet', 'threshold', 'knee', 'ratio', 'attack', 'release']) {
+        const v = Number(params[k]);
+        if (!Number.isFinite(v)) return;
+        next[k] = v;
+      }
+      next.gain = Math.max(0, Math.min(4, next.gain));
+      fxParams = next;
+      buses.forEach((bus) => applyBus(bus, true));
+    },
+    status(): { buses: number; reduction: number } {
+      const live = buses.filter((b) => b.ctx.state !== 'closed');
+      const last = live[live.length - 1];
+      return { buses: live.length, reduction: last ? Number(last.comp.reduction) || 0 : 0 };
+    },
+  };
+
   // SoundCloud owns the Web Audio graph, and its media element is created
   // before any tap we can reach: the first track therefore reads digital
   // silence out of __scAudioAnalyser (only the next source recreation taps
@@ -41,6 +154,7 @@ export function installAudioHook(): void {
       const stream = el.captureStream();
       if (!stream || !stream.getAudioTracks || !stream.getAudioTracks().length) return;
       const ctx = new OrigAudioContext();
+      ctx.__scNoBus = true; // silent analysis context, never audible
       if (ctx.state === 'suspended' && typeof ctx.resume === 'function') ctx.resume().catch(function () { /* noop */ });
       const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();

@@ -4,6 +4,8 @@ import { VISUALIZER_TYPES } from '../../shared/constants';
 import type { DownloadRequest } from '../../shared/types';
 import { isAllowedMediaUrl, isTrustedSoundCloudUrl } from '../../shared/security';
 import { KEYBIND_ACTIONS, parseCombo } from '../../shared/keybinds';
+import { isAudioFxState } from '../../shared/audio-fx';
+import { isBookmarkList } from '../../shared/bookmarks';
 
 export const STORE_KEYS: ReadonlySet<string> = new Set([
   'language', 'firstLaunch', 'geoBypass', 'geoBypass.enabled', 'geoBypass.proxyUrl', 'geoBypass.spoofCountry',
@@ -12,9 +14,9 @@ export const STORE_KEYS: ReadonlySet<string> = new Set([
   'adblocker', 'adblocker.enabled', 'adblocker.blockedCount', 'adblocker.customRules', 'adblocker.whitelist',
   'adblocker.remoteDomains', 'adblocker.lastUpdated', 'downloader', 'downloader.outputDir', 'downloader.quality',
   'downloader.history', 'settings', 'settings.startMinimized', 'settings.launchOnStartup', 'settings.accentColor',
-  'settings.dynamicAccent', 'settings.batterySaver', 'player', 'player.skipPromoted', 'player.skipPreviews', 'player.notifications', 'player.scrobble', 'player.resume', 'player.speed', 'searchHistory', 'wave',
+  'settings.dynamicAccent', 'settings.batterySaver', 'settings.ambient', 'player', 'player.skipPromoted', 'player.skipPreviews', 'player.notifications', 'player.scrobble', 'player.resume', 'player.speed', 'player.seekStep', 'player.reposts', 'searchHistory', 'wave',
   'settings.autoUpdate', 'settings.keybinds', 'history', 'history.enabled', 'history.maxTracks', 'history.tracks', 'history.stats', 'lyrics',
-  'lyrics.fontSize', 'themes', 'themes.active', 'themes.custom', 'customCss', 'customCss.code', 'equalizer', 'visualizer',
+  'lyrics.fontSize', 'themes', 'themes.active', 'themes.custom', 'customCss', 'customCss.code', 'equalizer', 'audioFx', 'visualizer',
   'sidebar',
   'sidebar.bookmarks', 'offlineCache', 'offlineCache.enabled', 'offlineCache.autoCache', 'offlineCache.maxSizeMB',
   'offlineCache.tracks',
@@ -26,7 +28,7 @@ export const READ_ONLY_STORE_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 const BOOLEAN_KEYS: ReadonlySet<string> = new Set([
-  'settings.dynamicAccent', 'settings.batterySaver', 'player.skipPromoted', 'player.skipPreviews',
+  'settings.dynamicAccent', 'settings.batterySaver', 'settings.ambient', 'player.skipPromoted', 'player.skipPreviews',
   'player.notifications', 'player.scrobble', 'player.resume',
 ]);
 
@@ -46,6 +48,10 @@ export function validateStoreValue(key: string, value: unknown): void {
   if (BOOLEAN_KEYS.has(key) && typeof value !== 'boolean') throw new Error('Invalid flag');
   if (key === 'player.speed' && (typeof value !== 'number' || !Number.isFinite(value) || value < 0.25 || value > 3)) {
     throw new Error('Invalid speed');
+  }
+  if (key === 'player.reposts' && value !== 'show' && value !== 'collapse' && value !== 'hide') throw new Error('Invalid repost mode');
+  if (key === 'player.seekStep' && value !== 5 && value !== 10 && value !== 15 && value !== 30) {
+    throw new Error('Invalid seek step');
   }
   if (key === 'wave') {
     if (!value || typeof value !== 'object' || Array.isArray(value) || JSON.stringify(value).length > 250000) throw new Error('Invalid wave data');
@@ -81,6 +87,11 @@ export function validateStoreValue(key: string, value: unknown): void {
       throw new Error('Invalid equalizer state');
     }
   }
+  if (key === 'sidebar.bookmarks' && !isBookmarkList(value)) throw new Error('Invalid bookmarks');
+  if (key === 'sidebar' && (!value || typeof value !== 'object' || !isBookmarkList((value as { bookmarks?: unknown }).bookmarks))) {
+    throw new Error('Invalid sidebar state');
+  }
+  if (key === 'audioFx' && !isAudioFxState(value)) throw new Error('Invalid audio effects state');
   if (key === 'visualizer') {
     const state = value as { enabled?: unknown; type?: unknown; lyricsRing?: unknown } | null;
     if (!state || typeof state !== 'object' || Array.isArray(state) || typeof state.enabled !== 'boolean' ||
@@ -116,6 +127,31 @@ export function validateDownloadRequest(input: unknown): DownloadRequest {
     album: request.album === undefined ? undefined : text(request.album, 'album', 500),
     trackNumber: request.trackNumber === undefined ? undefined : Math.max(1, Math.min(10000, Number(request.trackNumber) || 1)),
   };
+}
+
+/** "Save the playing track for offline" from the player bar (quick-actions.ts). */
+export interface OfflineQuickRequest {
+  trackUrl: string;
+  trackId: string;
+  title: string;
+  artist: string;
+  artworkUrl: string;
+  duration: number;
+}
+
+export function validateOfflineQuickRequest(input: unknown): OfflineQuickRequest {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid offline request');
+  const raw = input as Record<string, unknown>;
+  const trackUrl = typeof raw.trackUrl === 'string' ? raw.trackUrl : '';
+  if (!trackUrl || trackUrl.length > 2048 || !isTrustedSoundCloudUrl(trackUrl)) throw new Error('Track URL must be an HTTPS SoundCloud URL');
+  // Same id the auto-cache derives: the page path, never the query (?in=...).
+  const trackId = new URL(trackUrl).pathname.replace(/^\/+|\/+$/g, '').slice(0, 256);
+  if (!trackId || trackId.split('/').length < 2) throw new Error('Not a track URL');
+  const text = (value: unknown) => (typeof value === 'string' ? value.trim().slice(0, 500) : '');
+  const artworkUrl = typeof raw.artworkUrl === 'string' && raw.artworkUrl && isAllowedMediaUrl(raw.artworkUrl) ? raw.artworkUrl : '';
+  const duration = typeof raw.duration === 'number' && Number.isFinite(raw.duration) && raw.duration >= 0 && raw.duration < 86400 * 2
+    ? raw.duration : 0;
+  return { trackUrl, trackId, title: text(raw.title), artist: text(raw.artist), artworkUrl, duration };
 }
 
 /** True when the bytes are an HLS playlist rather than audio. */

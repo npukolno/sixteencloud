@@ -1,4 +1,5 @@
 import { t, getScriptTranslations } from '../../shared/i18n';
+import { audioFxParams } from '../../shared/audio-fx';
 
 export function getEqualizerOverlayHTML(): string {
   const freqs = ['32', '64', '125', '250', '500', '1k', '2k', '4k', '8k', '16k'];
@@ -23,8 +24,26 @@ export function getEqualizerOverlayHTML(): string {
         </label>
       </div>
 
-      <div id="sc-eq-status" style="font-size: 12px; color: #555; margin-top: 4px; margin-bottom: 8px;">
+      <div id="sc-eq-status" style="font-size: 12px; color: var(--sc-text-subtle); margin-top: 4px; margin-bottom: 8px;">
         ${t('eq.audio_hint')}
+      </div>
+
+      <div class="sc-overlay-group sc-fx-group" style="margin-top: 12px;">
+        <span class="sc-overlay-label">${t('fx.title')}</span>
+        <div class="sc-fx-row">
+          <span class="sc-fx-name">${t('fx.preamp')}</span>
+          <input type="range" min="-12" max="12" step="0.5" value="0" id="sc-fx-preamp" style="flex:1;accent-color:var(--sc-accent);">
+          <span id="sc-fx-preamp-val" class="sc-fx-val">0.0 dB</span>
+        </div>
+        <div class="sc-fx-row">
+          <span class="sc-fx-name">${t('fx.mode')}</span>
+          <select class="sc-overlay-select" id="sc-fx-mode" style="flex:1;">
+            <option value="off">${t('fx.mode_off')}</option>
+            <option value="limiter">${t('fx.mode_limiter')}</option>
+            <option value="normalize">${t('fx.mode_normalize')}</option>
+          </select>
+        </div>
+        <div id="sc-fx-status" style="font-size:12px;color:var(--sc-text-subtle);margin-top:2px;"></div>
       </div>
 
       <div class="sc-overlay-group" style="margin-top: 12px;">
@@ -58,7 +77,7 @@ export function getEqualizerOverlayHTML(): string {
 
 export function getEqualizerOverlayScript(): string {
   const _tr = JSON.stringify(getScriptTranslations([
-    'eq.active', 'eq.waiting',
+    'eq.active', 'eq.waiting', 'fx.status_on', 'fx.status_wait', 'fx.status_off',
   ]));
   return `
     (function() {
@@ -71,6 +90,64 @@ export function getEqualizerOverlayScript(): string {
 
       var api = window.sixteenCloud;
       if (!api) return;
+
+      // ---- Preamp + limiter on the master bus (preload/audio-hook.ts) ----
+      ${audioFxParams.toString()}
+      var fxPreamp = panel.querySelector('#sc-fx-preamp');
+      var fxPreampVal = panel.querySelector('#sc-fx-preamp-val');
+      var fxMode = panel.querySelector('#sc-fx-mode');
+      var fxStatus = panel.querySelector('#sc-fx-status');
+      var fxState = { preamp: 0, mode: 'off' };
+      var fxSaveTimer = null;
+      var style = document.createElement('style');
+      style.textContent = '.sc-fx-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}' +
+        '.sc-fx-name{font-size:12px;color:var(--sc-text-muted);min-width:72px}' +
+        '.sc-fx-val{font-size:12px;color:var(--sc-text-muted);min-width:52px;text-align:right;font-variant-numeric:tabular-nums}' +
+        '.sc-fx-row .sc-custom-dropdown{flex:1}';
+      document.head.appendChild(style);
+
+      function fxApply() {
+        if (window.__scAudioFx) window.__scAudioFx.set(audioFxParams(fxState));
+        var db = Number(fxState.preamp) || 0;
+        fxPreampVal.textContent = (db > 0 ? '+' : '') + db.toFixed(1) + ' dB';
+        fxStatusRender();
+      }
+      function fxStatusRender() {
+        var off = fxState.mode === 'off' && !fxState.preamp;
+        var st = window.__scAudioFx ? window.__scAudioFx.status() : { buses: 0, reduction: 0 };
+        if (off) fxStatus.textContent = _t('fx.status_off');
+        else if (!st.buses) fxStatus.textContent = _t('fx.status_wait');
+        else fxStatus.textContent = _t('fx.status_on').replace('{db}', Math.abs(st.reduction).toFixed(1));
+      }
+      function fxSave() {
+        if (fxSaveTimer) clearTimeout(fxSaveTimer);
+        var value = { preamp: Number(fxState.preamp) || 0, mode: fxState.mode };
+        fxSaveTimer = setTimeout(function() { fxSaveTimer = null; api.storeSet('audioFx', value).catch(function() {}); }, 200);
+      }
+      api.storeGet('audioFx').then(function(v) {
+        if (v && typeof v === 'object') {
+          fxState.preamp = Math.max(-12, Math.min(12, Number(v.preamp) || 0));
+          fxState.mode = v.mode === 'limiter' || v.mode === 'normalize' ? v.mode : 'off';
+        }
+        fxPreamp.value = String(fxState.preamp);
+        fxMode.value = fxState.mode;
+        fxApply();
+      }).catch(function() { fxApply(); });
+      fxPreamp.addEventListener('input', function() {
+        fxState.preamp = Math.max(-12, Math.min(12, Number(fxPreamp.value) || 0));
+        fxApply();
+        fxSave();
+      });
+      fxMode.addEventListener('change', function() {
+        fxState.mode = fxMode.value === 'limiter' || fxMode.value === 'normalize' ? fxMode.value : 'off';
+        fxApply();
+        fxSave();
+      });
+      // Live gain-reduction readout while the panel is on screen.
+      setInterval(function() {
+        var c = document.getElementById('sc-overlay-container');
+        if (!document.hidden && panel.classList.contains('active') && c && c.classList.contains('open')) fxStatusRender();
+      }, 1000);
 
       var FREQS = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
       var PRESETS = {
@@ -221,6 +298,7 @@ export function getEqualizerOverlayScript(): string {
       });
 
       enabledToggle.addEventListener('change', function() {
+        if (window.__scStatusSet) window.__scStatusSet('eq', enabledToggle.checked);
         if (enabledToggle.checked) {
           if (setupFilters()) applyBands(getBands());
           else trySetup();

@@ -1,21 +1,10 @@
-export function getTitlebarHTML(): string {
-  return `
-    <div id="sc-titlebar" style="
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 32px;
-      background: var(--sc-bg);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      z-index: 99999;
-      -webkit-app-region: drag;
-      user-select: none;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    ">
-      <div style="display: flex; align-items: center; padding-left: 10px; gap: 8px;">
+import { t, getScriptTranslations } from '../../shared/i18n';
+
+// Frameless window titlebar: logo, page navigation (back / forward / reload),
+// live indicators in the free space (sleep timer, Geo-Bypass proxy, download
+// progress; fed by status-hub.ts) and the window controls.
+
+const LOGO_SVG = `
         <svg width="16" height="16" viewBox="0 0 800 800" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M101.875 389.688C99.375 389.688 97.5 391.563 97.1875 394.375L90 481.875L97.1875 566.563C97.5 569.063 99.375 571.25 101.875 571.25C104.375 571.25 106.25 569.375 106.563 566.563L114.687 481.875L106.563 394.375C106.25 391.563 104.063 389.688 101.875 389.688Z" fill="white"/>
           <path d="M133.75 395.312C130.938 395.312 128.438 397.5 128.438 400.625L121.875 481.875L128.438 567.187C128.75 570.312 130.938 572.5 133.75 572.5C136.563 572.5 138.75 570.312 139.062 567.187L146.562 481.875L139.062 400.625C138.75 397.5 136.563 395.312 133.75 395.312Z" fill="white"/>
@@ -32,13 +21,42 @@ export function getTitlebarHTML(): string {
           <path d="M297.188 295.938C292.5 295.938 288.438 299.687 288.438 304.687L283.75 481.875L288.438 564.688C288.438 569.688 292.5 573.437 297.188 573.437C301.875 573.437 305.937 569.688 305.937 564.688L311.25 481.875L305.937 304.687C305.937 299.687 302.188 295.938 297.188 295.938Z" fill="white"/>
           <path d="M330.625 301.562C325.313 301.562 321.25 305.625 321.25 310.938L316.875 481.875L321.25 564.062C321.25 569.375 325.625 573.438 330.625 573.438C335.938 573.438 340 569.375 340 564.062L344.688 481.875L340 310.938C340 305.937 335.938 301.562 330.625 301.562Z" fill="white"/>
           <path d="M532.8 561H478.8V458.4L452.025 476.85L426.825 437.7L483.3 401.7H532.8V561ZM650.294 565.5C613.169 565.5 580.544 546.15 580.544 505.2C580.544 485.175 589.769 467.4 600.344 452.775L636.794 401.7H701.819L663.119 451.425V451.65H665.594C693.044 451.65 720.044 470.775 720.044 504.75C720.044 544.8 687.419 565.5 650.294 565.5ZM650.294 521.4C660.419 521.4 667.169 514.2 667.169 504.975C667.169 495.975 660.419 489 650.294 489C640.619 489 633.869 495.975 633.869 504.975C633.869 514.2 640.619 521.4 650.294 521.4Z" fill="var(--sc-bg)"/>
-        </svg>
-        <span style="color: var(--sc-text-muted); font-size: 12px; font-weight: 500;">SixteenCloud</span>
+        </svg>`;
+
+const ICONS = {
+  back: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>',
+  forward: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
+  reload: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>',
+  moon: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>',
+  globe: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.2 2.4 3.3 5.4 3.3 9s-1.1 6.6-3.3 9c-2.2-2.4-3.3-5.4-3.3-9S9.8 5.4 12 3Z"/></svg>',
+  download: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m-4-4 4 4 4-4M5 20h14"/></svg>',
+  min: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 18h14"/></svg>',
+  max: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="1"/></svg>',
+  restore: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 9h10v10H9z"/><path d="M5 15V5h10"/></svg>',
+  close: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>',
+};
+
+export function getTitlebarHTML(): string {
+  return `
+    <div id="sc-titlebar">
+      <div class="sc-tb-brand">
+        ${LOGO_SVG}
+        <span class="sc-tb-name">SixteenCloud</span>
       </div>
-      <div id="sc-titlebar-controls" style="display: flex; height: 100%; -webkit-app-region: no-drag;">
-        <button id="sc-tb-min" aria-label="Minimize" style="width: 46px; height: 100%; border: none; background: transparent; color: var(--sc-text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center;" onmouseover="this.style.background='var(--sc-surface-raised)'" onmouseout="this.style.background='transparent'"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 18h14"/></svg></button>
-        <button id="sc-tb-max" aria-label="Maximize" style="width: 46px; height: 100%; border: none; background: transparent; color: var(--sc-text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center;" onmouseover="this.style.background='var(--sc-surface-raised)'" onmouseout="this.style.background='transparent'"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="1"/></svg></button>
-        <button id="sc-tb-close" aria-label="Close" style="width: 46px; height: 100%; border: none; background: transparent; color: var(--sc-text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center;" onmouseover="this.style.background='#e81123';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='var(--sc-text-muted)'"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      <div class="sc-tb-nav">
+        <button type="button" class="sc-tb-btn" id="sc-tb-back" title="${t('titlebar.back')}" aria-label="${t('titlebar.back')}">${ICONS.back}</button>
+        <button type="button" class="sc-tb-btn" id="sc-tb-forward" title="${t('titlebar.forward')}" aria-label="${t('titlebar.forward')}">${ICONS.forward}</button>
+        <button type="button" class="sc-tb-btn" id="sc-tb-reload" title="${t('titlebar.reload')}" aria-label="${t('titlebar.reload')}">${ICONS.reload}</button>
+      </div>
+      <div class="sc-tb-status" aria-live="polite">
+        <button type="button" class="sc-tb-chip sc-tb-chip-sleep" id="sc-tb-sleep" data-panel="player" hidden>${ICONS.moon}<span></span></button>
+        <button type="button" class="sc-tb-chip sc-tb-chip-geo" id="sc-tb-geo" data-panel="geo-bypass" hidden>${ICONS.globe}<span></span></button>
+        <button type="button" class="sc-tb-chip sc-tb-chip-dl" id="sc-tb-dl" data-panel="downloader" hidden>${ICONS.download}<span></span><i class="sc-tb-chip-bar"><b></b></i></button>
+      </div>
+      <div id="sc-titlebar-controls">
+        <button type="button" class="sc-tb-win" id="sc-tb-min" aria-label="Minimize">${ICONS.min}</button>
+        <button type="button" class="sc-tb-win" id="sc-tb-max" aria-label="Maximize">${ICONS.max}</button>
+        <button type="button" class="sc-tb-win sc-tb-win-close" id="sc-tb-close" aria-label="Close">${ICONS.close}</button>
       </div>
     </div>
   `;
@@ -46,40 +64,101 @@ export function getTitlebarHTML(): string {
 
 export function getTitlebarScript(): string {
   const escapedHtml = JSON.stringify(getTitlebarHTML());
+  const tr = JSON.stringify(getScriptTranslations([
+    'titlebar.sleep_track', 'titlebar.sleep_title', 'titlebar.geo_title', 'titlebar.dl_title',
+  ]));
   return `
     (function() {
       if (document.getElementById('sc-titlebar')) return;
+      var _tr = ${tr};
+      function _t(k) { return _tr[k] || k; }
 
-      // Inject titlebar
-      var container = document.createElement('div');
-      container.innerHTML = ${escapedHtml};
-      var titlebar = container.firstElementChild;
+      var holder = document.createElement('div');
+      holder.innerHTML = ${escapedHtml};
+      var titlebar = holder.firstElementChild;
       document.body.prepend(titlebar);
 
       // Push body content down
       document.body.style.paddingTop = '32px';
 
+      function $(id) { return document.getElementById(id); }
+
+      // ---- Page navigation (SoundCloud is a single-page app: the history
+      // stack is its router, so back/forward never reload the document) ----
+      $('sc-tb-back').addEventListener('click', function() { history.back(); });
+      $('sc-tb-forward').addEventListener('click', function() { history.forward(); });
+      $('sc-tb-reload').addEventListener('click', function() { location.reload(); });
+
+      // ---- Indicators ----
+      function openPanel(id) {
+        var item = document.querySelector('#sc-overlay-rail .sc-nav-item[data-target="' + id + '"]');
+        if (item) item.click();
+      }
+      Array.prototype.forEach.call(titlebar.querySelectorAll('.sc-tb-chip'), function(chip) {
+        chip.addEventListener('click', function() { openPanel(chip.getAttribute('data-panel')); });
+      });
+
+      function fmt(ms) {
+        var s = Math.max(0, Math.round(ms / 1000));
+        var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+        return (h ? h + ':' + ('0' + m).slice(-2) : m) + ':' + ('0' + sec).slice(-2);
+      }
+      function show(chip, on, text, title) {
+        chip.hidden = !on;
+        if (!on) return;
+        var label = chip.querySelector('span');
+        if (label.textContent !== text) label.textContent = text;
+        if (title && chip.title !== title) chip.title = title;
+      }
+
+      var sleepTimer = null;
+      function renderSleep() {
+        var st = (window.__scStatus && window.__scStatus.sleep) || {};
+        var chip = $('sc-tb-sleep');
+        if (st.track) show(chip, true, _t('titlebar.sleep_track'), _t('titlebar.sleep_title'));
+        else if (st.end && st.end > Date.now()) show(chip, true, fmt(st.end - Date.now()), _t('titlebar.sleep_title'));
+        else show(chip, false);
+        var ticking = !!(st.end && st.end > Date.now());
+        if (ticking && !sleepTimer) sleepTimer = setInterval(renderSleep, 1000);
+        if (!ticking && sleepTimer) { clearInterval(sleepTimer); sleepTimer = null; }
+      }
+      function renderGeo() {
+        var g = (window.__scStatus && window.__scStatus.geo) || {};
+        show($('sc-tb-geo'), !!(g.enabled && g.proxy), g.country || 'Proxy', _t('titlebar.geo_title'));
+      }
+      function renderDl() {
+        var d = (window.__scStatus && window.__scStatus.dl) || {};
+        var chip = $('sc-tb-dl');
+        show(chip, !!d.busy, d.label || '', _t('titlebar.dl_title'));
+        if (d.busy) chip.querySelector('.sc-tb-chip-bar b').style.width = Math.round((d.fraction || 0) * 100) + '%';
+      }
+      function renderAll() { renderSleep(); renderGeo(); renderDl(); }
+      document.addEventListener('sc16:status', function(e) {
+        var part = e && e.detail && e.detail.part;
+        if (part === 'sleep') renderSleep();
+        else if (part === 'geo') renderGeo();
+        else if (part === 'dl') renderDl();
+      });
+      renderAll();
+
       var api = window.sixteenCloud;
       if (!api) return;
 
-      // Wire up buttons
-      document.getElementById('sc-tb-min').addEventListener('click', function() { api.windowMinimize(); });
-      document.getElementById('sc-tb-max').addEventListener('click', function() { api.windowMaximize(); updateMaxBtn(); });
-      document.getElementById('sc-tb-close').addEventListener('click', function() { api.windowClose(); });
+      // ---- Window controls ----
+      $('sc-tb-min').addEventListener('click', function() { api.windowMinimize(); });
+      $('sc-tb-max').addEventListener('click', function() { api.windowMaximize(); updateMaxBtn(); });
+      $('sc-tb-close').addEventListener('click', function() { api.windowClose(); });
 
-      // Update maximize icon based on state
+      var MAX_ICON = ${JSON.stringify(ICONS.max)};
+      var RESTORE_ICON = ${JSON.stringify(ICONS.restore)};
       function updateMaxBtn() {
         if (api.windowIsMaximized) {
           api.windowIsMaximized().then(function(isMax) {
-            document.getElementById('sc-tb-max').innerHTML = isMax
-              ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 9h10v10H9z"/><path d="M5 15V5h10"/></svg>'
-              : '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="1"/></svg>';
+            $('sc-tb-max').innerHTML = isMax ? RESTORE_ICON : MAX_ICON;
           });
         }
       }
       updateMaxBtn();
-
-      // Listen for window resize to update icon
       window.addEventListener('resize', updateMaxBtn);
     })();
   `;

@@ -57,6 +57,14 @@ export interface SidebarBookmark {
   name: string;
   url: string;
   type: 'track' | 'playlist' | 'artist';
+  /** Cover thumbnail (sndcdn.com only). */
+  artwork?: string;
+  /** Shown in the Pinned section at the top. */
+  pinned?: boolean;
+  /** Folder name; unset means "no folder". */
+  folder?: string;
+  /** Timecode bookmark: seconds into the track to jump to. */
+  time?: number;
 }
 
 export interface MiniPlayerState {
@@ -115,6 +123,8 @@ export interface StoreSchema {
     railHidden?: boolean;
     /** Drop the visualizer, blur and animations while on battery (default on). */
     batterySaver?: boolean;
+    /** Cover-palette glow above the player bar (default on). */
+    ambient?: boolean;
   };
   history: {
     enabled: boolean;
@@ -133,6 +143,10 @@ export interface StoreSchema {
     speed: number;
     /** Jump back to the remembered position after a restart (default on). */
     resume?: boolean;
+    /** Seconds per seek step (5, 10, 15 or 30; default 10). */
+    seekStep?: number;
+    /** Reposts in the home feed: shown, folded or dropped (default show). */
+    reposts?: 'show' | 'collapse' | 'hide';
   };
   searchHistory: string[];
   wave: {
@@ -157,6 +171,11 @@ export interface StoreSchema {
     preset: string;
     bands: number[];
     customPresets: Record<string, number[]>;
+  };
+  /** Preamp and limiter / leveller on the master bus (shared/audio-fx.ts). */
+  audioFx: {
+    preamp: number;
+    mode: 'off' | 'limiter' | 'normalize';
   };
   visualizer: {
     enabled: boolean;
