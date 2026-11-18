@@ -424,6 +424,13 @@ const en: Record<string, string> = {
   'common.remove': 'Remove',
   'common.yes': 'Yes',
   'common.no': 'No',
+  'titlebar.back': 'Back',
+  'titlebar.forward': 'Forward',
+  'titlebar.reload': 'Reload',
+  'titlebar.sleep_track': 'after track',
+  'titlebar.sleep_title': 'Sleep timer: open the Player panel',
+  'titlebar.geo_title': 'Geo-Bypass proxy is on',
+  'titlebar.dl_title': 'Downloads in progress',
 };
 
 const ru: Record<string, string> = {
@@ -847,6 +854,13 @@ const ru: Record<string, string> = {
   'common.remove': 'Удалить',
   'common.yes': 'Да',
   'common.no': 'Нет',
+  'titlebar.back': 'Назад',
+  'titlebar.forward': 'Вперёд',
+  'titlebar.reload': 'Обновить',
+  'titlebar.sleep_track': 'после трека',
+  'titlebar.sleep_title': 'Таймер сна: открыть панель «Плеер»',
+  'titlebar.geo_title': 'Прокси Geo-Bypass включён',
+  'titlebar.dl_title': 'Идёт скачивание',
 };
 
 const dictionaries: Record<Language, Record<string, string>> = { en, ru };
