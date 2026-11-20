@@ -6,6 +6,7 @@ import { setupScrobbleIPC } from './scrobble';
 import { setupDownloaderIPC } from './downloader';
 import { setupHistoryIPC } from './history';
 import { setupLyricsIPC } from './lyrics';
+import { setupLyricsyncIPC } from '../lyricsync/service';
 import { setupQuickActionsIPC } from './quick-actions';
 import { setupProfileIPC } from './profile';
 
@@ -24,6 +25,7 @@ export function setupIPC(mainWindow: BrowserWindow): void {
   setupDownloaderIPC(mainWindow);
   setupHistoryIPC(mainWindow);
   setupLyricsIPC(mainWindow);
+  setupLyricsyncIPC(mainWindow);
   setupQuickActionsIPC(mainWindow);
   setupProfileIPC(mainWindow);
 }

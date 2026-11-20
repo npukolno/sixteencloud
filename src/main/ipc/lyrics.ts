@@ -12,8 +12,47 @@ import {
 // Optional provider key; never ship credentials in the client bundle.
 const MUSIXMATCH_API_KEY = process.env.SIXTEENCLOUD_MUSIXMATCH_API_KEY || '';
 
-export function setupLyricsIPC(mainWindow: BrowserWindow): void {
+
+// --- Per-track lyrics memory (choice + offset), shared with lyricsync -------------
+const LYRICS_PREF_CAP = 200;
+
+export function updateLyricsPref(action: string, key: string, value?: unknown): unknown {
+  if (typeof key !== 'string' || !key || key.length > 600) throw new Error('Invalid lyrics key');
   const store = getStore();
+  const prefs = ((store as any).get('lyricsPrefs') || {}) as Record<string, { choice?: any; offset?: number }>;
+  if (action === 'get') return prefs[key] || null;
+  const entry = prefs[key] || {};
+  if (action === 'setOffset') {
+    if (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) > 60000) throw new Error('Invalid offset');
+    if (value === 0) delete entry.offset; else entry.offset = Math.round(value);
+  } else if (action === 'setChoice') {
+    if (value === null) delete entry.choice;
+    else {
+      const v = value as { lyrics?: unknown; syncedLyrics?: unknown; source?: unknown };
+      if (!v || typeof v.lyrics !== 'string' || v.lyrics.length > 200000 ||
+          (v.syncedLyrics !== undefined && (typeof v.syncedLyrics !== 'string' || v.syncedLyrics.length > 300000))) throw new Error('Invalid lyrics choice');
+      entry.choice = { lyrics: v.lyrics, syncedLyrics: v.syncedLyrics, source: typeof v.source === 'string' ? v.source.slice(0, 30) : 'manual' };
+    }
+  } else {
+    throw new Error('Unknown lyrics pref action');
+  }
+  delete prefs[key];
+  if (entry.choice || entry.offset) prefs[key] = entry;
+  const keys = Object.keys(prefs);
+  for (let i = 0; i < keys.length - LYRICS_PREF_CAP; i++) delete prefs[keys[i]];
+  (store as any).set('lyricsPrefs', prefs);
+  return prefs[key] || null;
+}
+
+/** Synced lyrics made on this computer (lyricsync), offered first among "other versions". */
+export interface LocalLyricsVersion { id: string; label: string; lyrics: string; syncedLyrics: string; durationDiff?: number }
+let localProvider: ((key: string) => LocalLyricsVersion[]) | null = null;
+export function setLocalLyricsProvider(fn: (key: string) => LocalLyricsVersion[]): void { localProvider = fn; }
+function localVersions(artist: string, title: string): LocalLyricsVersion[] {
+  try { return localProvider ? localProvider(`${artist}|${title}`.toLowerCase()) : []; } catch { return []; }
+}
+
+export function setupLyricsIPC(mainWindow: BrowserWindow): void {
   // Lyrics — multi-source parallel search with caching.
   // Synced-capable: lrclib.net, NetEase, QQ Music. Plain-only: Genius, lyrics.ovh,
   // Musixmatch, AZLyrics, lyrist, ChartLyrics. lrclib always ranks first.
@@ -250,37 +289,18 @@ export function setupLyricsIPC(mainWindow: BrowserWindow): void {
     const wanted: LyricsQuery[] = customQuery && customQuery.trim()
       ? [{ artist: query, title: query }]
       : (parsed.length ? parsed : [{ artist: query, title: query }]);
-    return collectLyricsCandidates(query, dur, altQuery, wanted);
+    const found = await collectLyricsCandidates(query, dur, altQuery, wanted);
+    // This computer's own syncs of exactly this track come first.
+    const own: LyricsCandidate[] = localVersions(artist, title).map((v) => ({
+      id: `sixteen:${v.id}`, source: 'sixteen', label: v.label, synced: true, lyrics: v.lyrics, syncedLyrics: v.syncedLyrics, durationDiff: v.durationDiff,
+    }));
+    return own.concat(found);
   });
 
   // Per-track memory: the lyrics the user picked and their sync offset (ms).
-  const LYRICS_PREF_CAP = 200;
   ipcMain.handle(IPC_CHANNELS.LYRICS_PREF, async (event, action: string, key: string, value?: unknown) => {
     assertMainRenderer(event, mainWindow);
-    if (typeof key !== 'string' || !key || key.length > 600) throw new Error('Invalid lyrics key');
-    const prefs = ((store as any).get('lyricsPrefs') || {}) as Record<string, { choice?: any; offset?: number }>;
-    if (action === 'get') return prefs[key] || null;
-    const entry = prefs[key] || {};
-    if (action === 'setOffset') {
-      if (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) > 60000) throw new Error('Invalid offset');
-      if (value === 0) delete entry.offset; else entry.offset = Math.round(value);
-    } else if (action === 'setChoice') {
-      if (value === null) delete entry.choice;
-      else {
-        const v = value as { lyrics?: unknown; syncedLyrics?: unknown; source?: unknown };
-        if (!v || typeof v.lyrics !== 'string' || v.lyrics.length > 200000 ||
-            (v.syncedLyrics !== undefined && (typeof v.syncedLyrics !== 'string' || v.syncedLyrics.length > 300000))) throw new Error('Invalid lyrics choice');
-        entry.choice = { lyrics: v.lyrics, syncedLyrics: v.syncedLyrics, source: typeof v.source === 'string' ? v.source.slice(0, 30) : 'manual' };
-      }
-    } else {
-      throw new Error('Unknown lyrics pref action');
-    }
-    delete prefs[key];
-    if (entry.choice || entry.offset) prefs[key] = entry;
-    const keys = Object.keys(prefs);
-    for (let i = 0; i < keys.length - LYRICS_PREF_CAP; i++) delete prefs[keys[i]];
-    (store as any).set('lyricsPrefs', prefs);
-    return prefs[key] || null;
+    return updateLyricsPref(action, key, value);
   });
 
   ipcMain.handle(IPC_CHANNELS.LYRICS_FETCH, async (event, artist: string, title: string, duration?: number) => {

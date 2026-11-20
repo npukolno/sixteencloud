@@ -53,7 +53,7 @@ export function getLyricsOverlayScript(): string {
     'lyrics.searching', 'lyrics.not_found', 'lyrics.fetch_failed',
     'lyrics.search_versions', 'lyrics.use_this', 'lyrics.reset_choice', 'lyrics.no_versions',
     'lyrics.synced', 'lyrics.plain', 'lyrics.query_placeholder', 'lyrics.chosen',
-    'lyrics.fs_version', 'lyrics.fs_version_toast', 'lyrics.fs_offset', 'common.close',
+    'lyrics.fs_version', 'lyrics.fs_version_toast', 'lyrics.fs_offset', 'common.close', 'lyrics.src_sixteen',
   ]));
   return `
     (function() {
@@ -159,6 +159,9 @@ export function getLyricsOverlayScript(): string {
       var lastPos = 0;
       var frames = 0;
       var stopLog = [];
+
+      // Our own syncs (lyricsync) are labelled as such, other sources by name.
+      function srcName(src) { return src === 'sixteen' ? _t('lyrics.src_sixteen') : String(src || ''); }
 
       function esc(s) {
         if (window.__scEscapeHtml) return window.__scEscapeHtml(s);
@@ -390,7 +393,7 @@ export function getLyricsOverlayScript(): string {
           var preview = String(c.lyrics || '').split(/\\r?\\n/).filter(Boolean).slice(0, 2).join(' / ');
           row.innerHTML =
             '<div class="sc-lyr-cand-main"><div class="sc-lyr-cand-label">' + esc(c.label) + '</div>' +
-            '<div class="sc-lyr-cand-meta">' + esc(c.source) + ' · ' + (c.synced ? _t('lyrics.synced') : _t('lyrics.plain')) +
+            '<div class="sc-lyr-cand-meta">' + esc(srcName(c.source)) + ' · ' + (c.synced ? _t('lyrics.synced') : _t('lyrics.plain')) +
             (typeof c.durationDiff === 'number' ? ' · Δ' + c.durationDiff.toFixed(0) + 's' : '') + '</div>' +
             '<div class="sc-lyr-cand-prev">' + esc(preview.slice(0, 110)) + '</div></div>';
           var btn = document.createElement('button');
@@ -457,11 +460,28 @@ export function getLyricsOverlayScript(): string {
           '#sc-lyrics-fs .sc-fs-headcover{flex:0 0 52px;width:52px;height:52px;border-radius:10px;object-fit:cover;box-shadow:0 6px 20px rgba(0,0,0,.45);background:rgba(255,255,255,.08)}' +
           '#sc-lyrics-fs .sc-fs-headcover[hidden]{display:none}' +
           '#sc-lyrics-fs .sc-fs-meta{min-width:0}' +
+          '#sc-lyrics-fs .sc-fs-src{margin-top:3px;font-size:11px;letter-spacing:.4px;opacity:.55}' +
           '#sc-lyrics-fs .sc-fs-title{font-size:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
           '#sc-lyrics-fs .sc-fs-tools{position:absolute;right:76px;top:21px;z-index:3;display:flex;align-items:center;gap:4px;padding:3px;border-radius:19px;background:rgba(255,255,255,.1)}' +
           '#sc-lyrics-fs .sc-fs-tool{height:30px;min-width:30px;padding:0 10px;border:0;border-radius:15px;background:transparent;color:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer}' +
           '#sc-lyrics-fs .sc-fs-tool:hover{background:rgba(255,255,255,.16)}' +
           '#sc-lyrics-fs .sc-fs-tool:disabled{opacity:.4;cursor:default;background:transparent}' +
+          '#sc-lyrics-fs .sc-fs-tool[data-fs="version"]{display:inline-flex;align-items:center;gap:5px}' +
+          '#sc-lyrics-fs .sc-fs-caret{width:14px;height:14px;opacity:.75;transition:transform .2s}' +
+          '#sc-lyrics-fs .sc-fs-tool[aria-expanded="true"] .sc-fs-caret{transform:rotate(180deg)}' +
+          '#sc-lyrics-fs .sc-fs-menu{position:absolute;right:76px;top:64px;z-index:4;display:none;width:min(420px,calc(100vw - 120px));max-height:min(60vh,460px);overflow:auto;padding:6px;border-radius:14px;background:rgba(20,20,24,.92);backdrop-filter:blur(18px);box-shadow:0 16px 40px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.08)}' +
+          '#sc-lyrics-fs .sc-fs-menu.open{display:block}' +
+          '#sc-lyrics-fs .sc-fs-menu-item{display:flex;gap:10px;align-items:flex-start;width:100%;padding:9px 10px;border:0;border-radius:10px;background:transparent;color:#fff;font:inherit;text-align:left;cursor:pointer}' +
+          '#sc-lyrics-fs .sc-fs-menu-item:hover{background:rgba(255,255,255,.08)}' +
+          '#sc-lyrics-fs .sc-fs-menu-item.on{background:rgba(255,255,255,.06)}' +
+          '#sc-lyrics-fs .sc-fs-menu-check{flex:0 0 15px;display:inline-flex;padding-top:2px;color:var(--sc-accent,#ff5500)}' +
+          '#sc-lyrics-fs .sc-fs-menu-check svg{width:15px;height:15px}' +
+          '#sc-lyrics-fs .sc-fs-menu-main{display:flex;flex-direction:column;gap:2px;min-width:0}' +
+          '#sc-lyrics-fs .sc-fs-menu-label{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+          '#sc-lyrics-fs .sc-fs-menu-meta{font-size:11px;opacity:.6}' +
+          '#sc-lyrics-fs .sc-fs-menu-msg{padding:10px;font-size:13px;opacity:.7}' +
+          // SoundCloud's volume slider pops up above the player bar: keep it over the full-screen lyrics
+          'html.sc-lyrics-fs-on .playControls{z-index:99995!important}' +
           '#sc-lyrics-fs .sc-fs-off-val{min-width:44px;text-align:center;font-size:12px;opacity:.8;font-variant-numeric:tabular-nums}' +
           '#sc-lyrics-fs .sc-fs-sep{width:1px;height:16px;background:rgba(255,255,255,.2);margin:0 2px}' +
           '#sc-lyrics-fs .sc-fs-artist{font-size:14px;opacity:.7;margin-top:2px}' +
@@ -487,54 +507,59 @@ export function getLyricsOverlayScript(): string {
       }
       injectLyricsStyles();
 
-      // "Another version" in full screen: walk through the candidate list
-      // (same sources as the panel's picker) and remember the choice.
-      var versions = { key: '', items: null, index: -1, loading: false };
+      // "Other versions" in full screen: a drop-down of the candidate list
+      // (same sources as the panel's picker); the choice is remembered.
+      var versions = { key: '', items: null, loading: false };
       function lyricsSig(r) { return r ? String(r.syncedLyrics || r.lyrics || '').slice(0, 400) : ''; }
-      function nextVersion(btn) {
-        if (!curPrefKey || versions.loading) return;
-        if (versions.key !== curPrefKey || !versions.items) {
-          versions = { key: curPrefKey, items: null, index: -1, loading: true };
-          btn.disabled = true;
-          var forKey = curPrefKey;
-          api.lyricsCandidates(curArtist, curTitle, curDur).then(function(items) {
-            if (forKey !== curPrefKey) return;
-            versions.items = Array.isArray(items) ? items.filter(function(c) { return c && c.lyrics; }) : [];
-            var cur = lyricsSig(curResult);
-            versions.index = versions.items.findIndex(function(c) { return lyricsSig(c) === cur; });
-          }).catch(function() {
-            versions.items = [];
-          }).then(function() {
-            versions.loading = false;
-            btn.disabled = false;
-            if (forKey === curPrefKey) stepVersion();
-          });
-          return;
-        }
-        stepVersion();
+      function versionMenu() { return fsEl ? fsEl.querySelector('.sc-fs-menu') : null; }
+      function closeVersionMenu() {
+        var m = versionMenu();
+        if (m) m.classList.remove('open');
+        var b = fsEl && fsEl.querySelector('[data-fs="version"]');
+        if (b) b.setAttribute('aria-expanded', 'false');
       }
-      function stepVersion() {
+      function toggleVersionMenu(btn) {
+        var menu = versionMenu();
+        if (!menu || !curPrefKey) return;
+        if (menu.classList.contains('open')) { closeVersionMenu(); return; }
+        menu.classList.add('open');
+        btn.setAttribute('aria-expanded', 'true');
+        if (versions.key === curPrefKey && versions.items) { renderVersionMenu(); return; }
+        if (versions.loading && versions.key === curPrefKey) return;
+        menu.innerHTML = '<div class="sc-fs-menu-msg">' + esc(_t('lyrics.searching')) + '</div>';
+        versions = { key: curPrefKey, items: null, loading: true };
+        var forKey = curPrefKey;
+        api.lyricsCandidates(curArtist, curTitle, curDur).then(function(items) {
+          if (forKey !== curPrefKey) return;
+          versions.items = Array.isArray(items) ? items.filter(function(c) { return c && c.lyrics; }) : [];
+        }).catch(function() {
+          versions.items = [];
+        }).then(function() {
+          versions.loading = false;
+          if (forKey === curPrefKey) renderVersionMenu();
+        });
+      }
+      function renderVersionMenu() {
+        var menu = versionMenu();
+        if (!menu) return;
         var items = versions.items || [];
-        if (!items.length) { if (window.__scToast) window.__scToast(_t('lyrics.no_versions')); return; }
+        if (!items.length) { menu.innerHTML = '<div class="sc-fs-menu-msg">' + esc(_t('lyrics.no_versions')) + '</div>'; return; }
         var cur = lyricsSig(curResult);
-        var next = versions.index;
-        for (var i = 1; i <= items.length; i++) {
-          var k = (versions.index + i) % items.length;
-          if (lyricsSig(items[k]) !== cur || items.length === 1) { next = k; break; }
-        }
-        if (next < 0) next = 0;
-        versions.index = next;
-        var c = items[next];
+        menu.innerHTML = items.map(function(c, i) {
+          var on = lyricsSig(c) === cur;
+          return '<button class="sc-fs-menu-item' + (on ? ' on' : '') + '" role="menuitemradio" aria-checked="' + on + '" data-i="' + i + '">' +
+            '<span class="sc-fs-menu-check">' + (on ? '<svg class="sc-akar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>' : '') + '</span>' +
+            '<span class="sc-fs-menu-main"><span class="sc-fs-menu-label">' + esc(c.label) + '</span>' +
+            '<span class="sc-fs-menu-meta">' + esc(srcName(c.source)) + ' · ' + esc(c.synced ? _t('lyrics.synced') : _t('lyrics.plain')) +
+            (typeof c.durationDiff === 'number' ? ' · Δ' + c.durationDiff.toFixed(0) + 's' : '') + '</span></span></button>';
+        }).join('');
+      }
+      function chooseVersion(c) {
         var chosen = { lyrics: c.lyrics, syncedLyrics: c.syncedLyrics, source: c.source };
         fetchSeq++;
         applyResult(chosen);
         if (typeof api.lyricsPref === 'function') api.lyricsPref('setChoice', curPrefKey, chosen).catch(function() {});
-        if (window.__scToast) {
-          window.__scToast(_t('lyrics.fs_version_toast', {
-            n: String(next + 1), total: String(items.length),
-            source: String(c.source || '') + (c.synced ? ' \u00b7 ' + _t('lyrics.synced') : '')
-          }));
-        }
+        closeVersionMenu();
       }
 
       function ensureFs() {
@@ -550,9 +575,10 @@ export function getLyricsOverlayScript(): string {
             '<span class="sc-fs-off-val"></span>' +
             '<button class="sc-fs-tool" data-fs="off-plus" title="' + esc(_t('lyrics.fs_offset')) + '" aria-label="+0.5s">+0.5</button>' +
             '<span class="sc-fs-sep"></span>' +
-            '<button class="sc-fs-tool" data-fs="version">' + esc(_t('lyrics.fs_version')) + '</button>' +
+            '<button class="sc-fs-tool" data-fs="version" aria-haspopup="menu" aria-expanded="false">' + esc(_t('lyrics.fs_version')) + '<svg class="sc-akar-icon sc-fs-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>' +
           '</div>' +
-          '<div class="sc-fs-head"><img class="sc-fs-headcover" alt="" hidden><div class="sc-fs-meta"><div class="sc-fs-title"></div><div class="sc-fs-artist"></div></div></div>' +
+          '<div class="sc-fs-menu" role="menu"></div>' +
+          '<div class="sc-fs-head"><img class="sc-fs-headcover" alt="" hidden><div class="sc-fs-meta"><div class="sc-fs-title"></div><div class="sc-fs-artist"></div><div class="sc-fs-src" hidden></div></div></div>' +
           '<div class="sc-fs-body"></div>';
         document.body.appendChild(fsEl);
         fsEl.querySelector('.sc-fs-close').addEventListener('click', closeFs);
@@ -562,7 +588,16 @@ export function getLyricsOverlayScript(): string {
           var what = b.getAttribute('data-fs');
           if (what === 'off-minus') changeOffset(-500);
           else if (what === 'off-plus') changeOffset(500);
-          else if (what === 'version') nextVersion(b);
+          else if (what === 'version') toggleVersionMenu(b);
+        });
+        fsEl.querySelector('.sc-fs-menu').addEventListener('click', function(e) {
+          var it = e.target.closest ? e.target.closest('.sc-fs-menu-item') : null;
+          if (!it || !versions.items) return;
+          var c = versions.items[Number(it.getAttribute('data-i'))];
+          if (c) chooseVersion(c);
+        });
+        fsEl.addEventListener('mousedown', function(e) {
+          if (!e.target.closest || (!e.target.closest('.sc-fs-menu') && !e.target.closest('[data-fs="version"]'))) closeVersionMenu();
         });
         var cover = fsEl.querySelector('.sc-fs-headcover');
         cover.addEventListener('error', function() { cover.hidden = true; });
@@ -582,6 +617,10 @@ export function getLyricsOverlayScript(): string {
         if (verBtn) verBtn.disabled = !curPrefKey;
         fsEl.querySelector('.sc-fs-title').textContent = curTitle;
         fsEl.querySelector('.sc-fs-artist').textContent = curArtist;
+        var srcEl = fsEl.querySelector('.sc-fs-src');
+        var own = !!(curResult && curResult.source === 'sixteen');
+        srcEl.hidden = !own;
+        srcEl.textContent = own ? _t('lyrics.src_sixteen') : '';
         var body = fsEl.querySelector('.sc-fs-body');
         body.scrollTop = 0;
         fsLineEls = [];
@@ -626,6 +665,7 @@ export function getLyricsOverlayScript(): string {
         fsOpen = true;
         if (typeof window.__scCloseOverlay === 'function') window.__scCloseOverlay();
         fsEl.classList.add('open');
+        document.documentElement.classList.add('sc-lyrics-fs-on');
         fsRender();
         if (!fsTimer) fsTimer = setInterval(fsTick, 120);
         startPolling();
@@ -633,12 +673,19 @@ export function getLyricsOverlayScript(): string {
       function closeFs() {
         fsOpen = false;
         if (fsEl) fsEl.classList.remove('open');
+        document.documentElement.classList.remove('sc-lyrics-fs-on');
+        closeVersionMenu();
         if (fsTimer) { clearInterval(fsTimer); fsTimer = null; }
         if (!isPanelActive()) stopPolling();
       }
       window.__scLyricsToggleFs = function() { if (fsOpen) closeFs(); else openFs(); };
       panel.querySelector('#sc-lyr-fs').addEventListener('click', openFs);
-      document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && fsOpen) { e.stopPropagation(); closeFs(); } }, true);
+      document.addEventListener('keydown', function(e) {
+        if (e.key !== 'Escape' || !fsOpen) return;
+        e.stopPropagation();
+        var m = versionMenu();
+        if (m && m.classList.contains('open')) closeVersionMenu(); else closeFs();
+      }, true);
 
       // A new track should replace the lyrics at once, not on the next 3s poll.
       (function hookTrackEvents() {
@@ -694,6 +741,13 @@ export function getLyricsOverlayScript(): string {
       document.addEventListener('visibilitychange', function() {
         if (isPanelActive()) startPolling(); else stopPolling();
       });
+
+      // The Sync tab saved a new version for some track: re-read the choice.
+      window.__scLyricsRefresh = function() {
+        lastTrack = '';
+        versions = { key: '', items: null, loading: false };
+        if (isPanelActive()) { try { detectAndFetch(); } catch (e) { /* next poll */ } }
+      };
 
       window.__scLyricsDebug = function() {
         var au = window.__scAudioElement;

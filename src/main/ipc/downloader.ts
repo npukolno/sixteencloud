@@ -27,7 +27,7 @@ type Quality = DownloadRequest['quality'];
 // Converting needs a real ffmpeg. The bundled ffmpeg-static binary can be
 // missing or built for another platform, so fall back to a system ffmpeg
 // before giving up on the download.
-function resolveFfmpegPath(): string {
+export function resolveFfmpegPath(): string {
   let staticPath = '';
   try {
     staticPath = (require('ffmpeg-static') as string) || '';

@@ -55,6 +55,7 @@ function injectPage(win: BrowserWindow, afterInject: () => void): void {
   injectOverlaySystem(win);
   injectPageScript(win, 'load-watcher');
   injectPageScript(win, 'media-session');
+  injectPageScript(win, 'lyricsync');
   runInPage(win, getTitlebarScript()).catch((e: any) => logWarn('Titlebar inject error:', e?.message));
   // After the overlay scripts that define the hooks it calls.
   setImmediate(afterInject);

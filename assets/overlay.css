@@ -543,6 +543,46 @@ html.sc-rail-compact body:not(.sc-overlay-open) > #sc-overlay-rail:not(:hover):n
   opacity: 1;
 }
 
+/* Beta features: a pill next to the label when the rail is open, a tiny mark on the icon when it is not. */
+.sc-nav-beta {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  flex: 0 0 auto;
+  align-self: center;
+  margin-left: -5px;           /* right after the label, not pushed to the edge */
+  padding: 1px 0;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  line-height: 1.3;
+  color: var(--sc-accent);
+  box-shadow: inset 0 0 0 1px rgba(var(--sc-accent-rgb), .5);
+  transition: max-width 280ms cubic-bezier(.2, .9, .25, 1), opacity 200ms ease, padding 200ms ease;
+}
+#sc-overlay-rail:hover .sc-nav-beta,
+#sc-overlay-rail:focus-within .sc-nav-beta {
+  max-width: 48px;
+  opacity: 1;
+  padding: 1px 5px;
+}
+.sc-nav-beta-mark {
+  position: absolute;
+  right: calc(50% - var(--sc-icon-size) / 2 - 6px);
+  bottom: -3px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--sc-accent);
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+#sc-overlay-rail:hover .sc-nav-beta-mark,
+#sc-overlay-rail:focus-within .sc-nav-beta-mark {
+  opacity: 0;
+}
+
 /* Thin separators between rail groups (player / tools / integrations /
    appearance / settings), see NAV_ITEMS in main.ts. */
 .sc-nav-sep {

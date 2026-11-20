@@ -129,6 +129,22 @@ const api = {
   lyricsFetch: (artist: string, title: string, duration?: number): Promise<unknown> =>
     ipcRenderer.invoke(IPC_CHANNELS.LYRICS_FETCH, artist, title, duration),
 
+  // Lyrics sync (local models)
+  lsyncStatus: (): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.LSYNC_STATUS),
+  lsyncInstall: (packs: string[]): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.LSYNC_INSTALL, packs),
+  lsyncCancelInstall: (): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.LSYNC_CANCEL_INSTALL),
+  lsyncRemove: (pack: string): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.LSYNC_REMOVE, pack),
+  lsyncStart: (request: unknown): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.LSYNC_START, request),
+  lsyncCancel: (): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.LSYNC_CANCEL),
+  lsyncCheckText: (text: string): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.LSYNC_CHECK_TEXT, text),
+  lsyncSave: (opts: unknown): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.LSYNC_SAVE, opts),
+  lsyncLibrary: (): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.LSYNC_LIBRARY),
+  lsyncGet: (id: string): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.LSYNC_GET, id),
+  lsyncDelete: (id: string): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.LSYNC_DELETE, id),
+  lsyncPickFile: (): Promise<unknown> => ipcRenderer.invoke(IPC_CHANNELS.LSYNC_PICK_FILE),
+  onLsyncEvent: (callback: (event: unknown) => void): Unsubscribe =>
+    subscribe<unknown>(IPC_CHANNELS.LSYNC_EVENT, callback),
+
   // Playlist download
   downloadPlaylist: (playlistUrl: string, pageToken?: string): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_PLAYLIST, playlistUrl, pageToken || ''),

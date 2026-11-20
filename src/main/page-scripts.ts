@@ -8,7 +8,7 @@ import { runInPage } from './page';
 // by scripts/build-renderer.mjs. Read once, injected on every page load.
 const cache = new Map<string, string>();
 
-export type PageScript = 'media-session' | 'load-watcher';
+export type PageScript = 'media-session' | 'load-watcher' | 'lyricsync';
 
 function load(name: PageScript): string | null {
   if (cache.has(name)) return cache.get(name)!;

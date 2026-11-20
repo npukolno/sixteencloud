@@ -240,6 +240,7 @@ function getOverlayInitScript(): string {
   const NAV_ITEMS = [
     { id: 'player', group: 'player', icon: icon('player'), label: t('nav.player') },
     { id: 'lyrics', group: 'player', icon: icon('lyrics'), label: t('nav.lyrics') },
+    { id: 'lyricsync', group: 'player', badge: 'BETA', icon: icon('lyricsync'), label: t('nav.lyricsync') },
     { id: 'equalizer', group: 'player', icon: icon('equalizer'), label: t('nav.equalizer') },
     { id: 'downloader', group: 'tools', icon: icon('downloader'), label: t('nav.downloader') },
     { id: 'offline-cache', group: 'tools', icon: icon('offline'), label: t('nav.offline') },
@@ -255,7 +256,7 @@ function getOverlayInitScript(): string {
 
   const navHTML = NAV_ITEMS.map((n, i) =>
     (i > 0 && NAV_ITEMS[i - 1].group !== n.group ? '<div class="sc-nav-sep" role="separator" aria-hidden="true"></div>' : '') +
-    `<div class="sc-nav-item" data-target="${n.id}" data-group="${n.group}" role="button" tabindex="0" aria-pressed="false" aria-controls="sc-panel-${n.id}"><span class="sc-nav-icon">${n.icon}</span><span class="sc-nav-label">${n.label}</span></div>`
+    `<div class="sc-nav-item" data-target="${n.id}" data-group="${n.group}" role="button" tabindex="0" aria-pressed="false" aria-controls="sc-panel-${n.id}"><span class="sc-nav-icon">${n.icon}${'badge' in n ? '<span class="sc-nav-beta-mark" aria-hidden="true">β</span>' : ''}</span><span class="sc-nav-label">${n.label}</span>${'badge' in n ? `<span class="sc-nav-beta">${n.badge}</span>` : ''}</div>`
   ).join('');
 
   const panelsHTML = NAV_ITEMS.map(n =>
@@ -919,6 +920,8 @@ function injectOverlayPanels(win: BrowserWindow): void {
     'settings': { html: getSettingsOverlayHTML(), script: getSettingsOverlayScript() },
     'history': { html: getHistoryOverlayHTML(), script: getHistoryOverlayScript() },
     'lyrics': { html: getLyricsOverlayHTML(), script: getLyricsOverlayScript() },
+    // Filled by the lyricsync page script (src/renderer/page/lyricsync.ts).
+    'lyricsync': { html: '', script: '' },
     'equalizer': { html: getEqualizerOverlayHTML(), script: getEqualizerOverlayScript() },
     'player': { html: getPlayerToolsOverlayHTML(), script: getPlayerToolsOverlayScript() },
     'themes': { html: getThemesOverlayHTML(), script: getThemesOverlayScript() },

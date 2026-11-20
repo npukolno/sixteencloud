@@ -13,6 +13,7 @@ const en: Record<string, string> = {
   'nav.history': 'History',
   'nav.offline': 'Offline',
   'nav.lyrics': 'Lyrics',
+  'nav.lyricsync': 'Sync',
   'nav.equalizer': 'Equalizer',
   'nav.player': 'Player',
   'nav.visualizer': 'Visualizer',
@@ -345,6 +346,7 @@ const en: Record<string, string> = {
   'lyrics.fs_version': 'Another version',
   'lyrics.fs_version_toast': 'Lyrics version {n} of {total}: {source}',
   'lyrics.fs_offset': 'Shift the sync by half a second',
+  'lyrics.src_sixteen': 'your sync',
 
   // Themes overlay
   'themes.title': 'Themes',
@@ -500,6 +502,7 @@ const ru: Record<string, string> = {
   'nav.history': 'История',
   'nav.offline': 'Офлайн',
   'nav.lyrics': 'Тексты песен',
+  'nav.lyricsync': 'Синхро',
   'nav.equalizer': 'Эквалайзер',
   'nav.player': 'Плеер',
   'nav.visualizer': 'Визуализатор',
@@ -832,6 +835,7 @@ const ru: Record<string, string> = {
   'lyrics.fs_version': 'Другая версия',
   'lyrics.fs_version_toast': 'Версия текста {n} из {total}: {source}',
   'lyrics.fs_offset': 'Сдвинуть синхронизацию на полсекунды',
+  'lyrics.src_sixteen': 'своя синхронизация',
 
   // Themes overlay
   'themes.title': 'Темы',
