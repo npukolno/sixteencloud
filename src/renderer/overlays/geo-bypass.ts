@@ -20,6 +20,11 @@ export function getGeoBypassOverlayHTML(): string {
       </div>
 
       <div class="sc-overlay-group">
+        <span class="sc-overlay-label">${t('geo.vpn_title')}</span>
+        <div class="sc-overlay-hint">${t('geo.vpn_hint')}</div>
+      </div>
+
+      <div class="sc-overlay-group">
         <span class="sc-overlay-label">${t('geo.target_country')}</span>
         <select class="sc-overlay-select" id="sc-geo-country">
           <option value="US" selected>${t('geo.us')}</option>
