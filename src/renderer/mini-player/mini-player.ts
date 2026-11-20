@@ -1,6 +1,7 @@
 // Mini-player page script. Bundled by scripts/build-renderer.mjs into
 // dist/renderer/mini-player/mini-player.js (IIFE, no imports at runtime).
 import type { SixteenCloudMiniAPI } from '../../preload/mini-preload';
+import { MINI_ICON_BODY } from '../../shared/icons';
 import { isSafeCssColor, MINI_THEME_TOKENS, type MiniAction, type MiniPlayerState } from '../../shared/mini-player';
 
 declare global {
@@ -9,10 +10,17 @@ declare global {
 
 const api = window.sixteenCloudMini;
 
-const SPK_ON = '<path d="M4 10v4h3l4 3V7l-4 3H4Z"/><path d="M14.5 9.3a4 4 0 0 1 0 5.4"/><path d="M17.2 6.8a7.5 7.5 0 0 1 0 10.4"/>';
-const SPK_OFF = '<path d="M4 10v4h3l4 3V7l-4 3H4Z"/><path d="m15.5 9.5 5 5m0-5-5 5"/>';
-const ICON_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4.5 19 12 7.5 19.5Z"/></svg>';
-const ICON_PAUSE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4.5h3.4v15H7.5zM13.1 4.5h3.4v15h-3.4z"/></svg>';
+const svg = (body: string): string => `<svg viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
+const SPK_ON = MINI_ICON_BODY.speaker + MINI_ICON_BODY.waves;
+const SPK_OFF = MINI_ICON_BODY.speaker + MINI_ICON_BODY.muted;
+const ICON_PLAY = svg(MINI_ICON_BODY.play);
+const ICON_PAUSE = svg(MINI_ICON_BODY.pause);
+
+// Static buttons carry <svg data-icon="name">; the shapes live in shared/icons.
+document.querySelectorAll<SVGElement>('svg[data-icon]').forEach((el) => {
+  const body = MINI_ICON_BODY[el.getAttribute('data-icon') as keyof typeof MINI_ICON_BODY];
+  if (body) el.innerHTML = body;
+});
 
 const DEFAULT_STRINGS: Record<string, string> = {
   'mini.title': 'Mini player', 'mini.nothing_playing': 'Nothing playing', 'mini.start_hint': 'Start a track in SixteenCloud',

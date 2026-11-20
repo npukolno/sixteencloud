@@ -503,17 +503,9 @@ html.sc-rail-compact body:not(.sc-overlay-open) > #sc-overlay-rail:not(:hover):n
   height: var(--sc-icon-size);
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.7;
+  stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-/* Discord mark is a solid glyph (Figma source) — no stroke, fill only. */
-.sc-nav-icon svg.sc-icon-discord {
-  width: calc(var(--sc-icon-size) * 1.17);
-  height: calc(var(--sc-icon-size) * 0.94);
-  fill: currentColor;
-  stroke: none;
 }
 
 .sc-akar-icon {

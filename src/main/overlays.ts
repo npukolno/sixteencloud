@@ -1,6 +1,7 @@
 // Overlay UI for the SoundCloud page: the left rail, the overlay window with
 // its panels, the first-launch tour. Built as HTML/JS strings and injected on
 // every page load (see injectPage in main.ts).
+import { navIconSvg, type NavIconName } from '../shared/icons';
 import type { BrowserWindow } from 'electron';
 import path from 'path';
 import fs from 'fs';
@@ -233,50 +234,23 @@ function injectWelcomeScreen(win: BrowserWindow): void {
 }
 
 function getOverlayInitScript(): string {
-  // Feather icons (MIT), embedded locally to avoid font/network dependencies.
-  const icon = (pathData: string, extra = '') => {
-    // Akar Icons (MIT), sourced from icon-sets.iconify.design/akar-icons.
-    const akar: Record<string, string> = {
-      globe: '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(90 12 12)"/><path d="M2 12h20"/></g>',
-      discord: '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"><path stroke-linejoin="round" d="M14 19c3.771 0 5.657 0 6.828-1.172S22 14.771 22 11s0-5.657-1.172-6.828S17.771 3 14 3h-4C6.229 3 4.343 3 3.172 4.172S2 7.229 2 11s0 5.657 1.172 6.828c.653.654 1.528.943 2.828 1.07"/><path d="M12 11v.01M8 11v.01m8-.01v.01M14 19c-1.236 0-2.598.5-3.841 1.145c-1.998 1.037-2.997 1.556-3.489 1.225s-.399-1.355-.212-3.404L6.5 17.5"/></g>',
-      shield: '<g fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M8 12h8"/></g>',
-      key: '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m8 18 2-2h2l1.36-1.36a6.5 6.5 0 1 0-3.997-3.992L2 18v4h4l2-2z"/><circle cx="17" cy="7" r="1"/></g>',
-      download: '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15V3m0 12-4-4m4 4 4-4M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.877a2 2 0 0 0 1.94-1.515L22 17"/>',
-      history: '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7.2V12l3.4 2"/></g>',
-      music: '<g fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v14"/><path d="M19 7.674v-.657a4 4 0 0 0-2.901-3.846l-2.824-.807A1 1 0 0 0 12 3.326V7l5.725 1.636A1 1 0 0 0 19 7.674Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 18a3 3 0 1 1-6 0c0-1.657 1.343-2 3-2s3 .343 3 2"/></g>',
-      palette: '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="8.5" cy="10" r="1.6"/><path d="M20.5 17.5 15 12l-8.5 7.5"/></g>',
-      code: '<path fill="none" stroke="currentColor" stroke-width="2" d="M9.3 17.85a3.15 3.15 0 1 1-3.15-3.15h11.7a3.15 3.15 0 1 1-3.15 3.15V6.15a3.15 3.15 0 1 1 3.15 3.15H6.15A3.15 3.15 0 1 1 9.3 6.15z"/>',
-      settings: '<g fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3.269C14 2.568 13.432 2 12.731 2H11.27C10.568 2 10 2.568 10 3.269c0 .578-.396 1.074-.935 1.286q-.128.052-.253.106c-.531.23-1.162.16-1.572-.249a1.27 1.27 0 0 0-1.794 0L4.412 5.446a1.27 1.27 0 0 0 0 1.794c.41.41.48 1.04.248 1.572a8 8 0 0 0-.105.253c-.212.539-.708.935-1.286.935C2.568 10 2 10.568 2 11.269v1.462C2 13.432 2.568 14 3.269 14c.578 0 1.074.396 1.286.935q.052.128.105.253c.231.531.161 1.162-.248 1.572a1.27 1.27 0 0 0 0 1.794l1.034 1.034a1.27 1.27 0 0 0 1.794 0c.41-.41 1.04-.48 1.572-.249q.125.055.253.106c.539.212.935.708.935 1.286c0 .701.568 1.269 1.269 1.269h1.462c.701 0 1.269-.568 1.269-1.269c0-.578.396-1.074.935-1.287q.128-.05.253-.104c.531-.232 1.162-.161 1.571.248a1.27 1.27 0 0 0 1.795 0l1.034-1.034a1.27 1.27 0 0 0 0-1.794c-.41-.41-.48-1.04-.249-1.572q.055-.125.106-.253c.212-.539.708-.935 1.286-.935c.701 0 1.269-.568 1.269-1.269V11.27c0-.701-.568-1.269-1.269-1.269c-.578 0-1.074-.396-1.287-.935a8 8 0 0 0-.105-.253c-.23-.531-.16-1.162.249-1.572a1.27 1.27 0 0 0 0-1.794l-1.034-1.034a1.27 1.27 0 0 0-1.794 0c-.41.41-1.04.48-1.572.249a8 8 0 0 0-.253-.106C14.396 4.343 14 3.847 14 3.27Z"/><path d="M16 12a4 4 0 1 1-8 0a4 4 0 0 1 8 0Z"/></g>',
-    };
-    let body = pathData;
-    if (pathData.startsWith('M12 21a9 9')) body = akar.globe;
-    else if (pathData.startsWith('M7.3')) body = akar.discord;
-    else if (pathData.startsWith('M12 3 20')) body = akar.shield;
-    else if (pathData.startsWith('M15 7')) body = akar.key;
-    else if (pathData.startsWith('M12 3v11')) body = akar.download;
-    else if (pathData.startsWith('M4 5.5')) body = akar.history;
-    else if (pathData.startsWith('M9 18V6')) body = akar.music;
-    else if (pathData.startsWith('M12 3a9 9')) body = akar.palette;
-    else if (pathData.startsWith('M8 8')) body = akar.code;
-    else if (pathData.startsWith('M12 8.5')) body = akar.settings;
-    return `<svg class="sc-akar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"${extra}>${body}</svg>`;
-  };
+  const icon = (name: NavIconName) => navIconSvg(name);
 
   // Grouped by purpose; a thin separator is drawn between groups.
   const NAV_ITEMS = [
-    { id: 'player', group: 'player', icon: icon('<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2.5h6"/></g>'), label: t('nav.player') },
-    { id: 'lyrics', group: 'player', icon: icon('M9 18V6l10-2v12M9 18a3 3 0 1 1-3-3 3 3 0 0 1 3 3Zm10-2a3 3 0 1 1-3-3 3 3 0 0 1 3 3Z'), label: t('nav.lyrics') },
-    { id: 'equalizer', group: 'player', icon: icon('<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>'), label: t('nav.equalizer') },
-    { id: 'downloader', group: 'tools', icon: icon('M12 3v11M7 10l5 5 5-5M5 20h14'), label: t('nav.downloader') },
-    { id: 'offline-cache', group: 'tools', icon: icon('<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"><path d="M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9.5a3.5 3.5 0 0 1 .5 6.96"/><path d="M12 12v6m0 0-2.5-2.5M12 18l2.5-2.5"/></g>'), label: t('nav.offline') },
-    { id: 'history', group: 'tools', icon: icon('M4 5.5A2.5 2.5 0 0 1 6.5 3H19v17H6.5A2.5 2.5 0 0 1 4 17.5v-12ZM4 17.5A2.5 2.5 0 0 1 6.5 15H19M8 7h7M8 10h7'), label: t('nav.history') },
-    { id: 'geo-bypass', group: 'integrations', icon: icon('M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM3 12h18M12 3c2.2 2.4 3.3 5.4 3.3 9s-1.1 6.6-3.3 9c-2.2-2.4-3.3-5.4-3.3-9S9.8 5.4 12 3Z'), label: t('nav.geo_bypass') },
-    { id: 'discord-rp', group: 'integrations', icon: '<svg class="sc-icon-discord" viewBox="0 0 32 25" aria-hidden="true" focusable="false"><path d="M26.8121 2.052C24.7632 1.09338 22.5725 0.396698 20.2821 0C20.0008 0.508553 19.6722 1.19257 19.4456 1.7367C17.0109 1.37055 14.5985 1.37055 12.2086 1.7367C11.982 1.19257 11.646 0.508553 11.3622 0C9.06931 0.396698 6.87603 1.09594 4.82715 2.05708C0.69455 8.30199 -0.425731 14.3918 0.13441 20.3951C2.87537 22.442 5.53169 23.6854 8.14318 24.4991C8.78798 23.6116 9.36304 22.6683 9.85845 21.6741C8.91493 21.3156 8.01124 20.8732 7.15736 20.3595C7.38389 20.1917 7.60547 20.0162 7.81955 19.8357C13.0276 22.2716 18.6863 22.2716 23.8321 19.8357C24.0487 20.0162 24.2703 20.1917 24.4943 20.3595C23.6379 20.8757 22.7318 21.3181 21.7883 21.6767C22.2837 22.6683 22.8563 23.6142 23.5035 24.5016C26.1175 23.6879 28.7763 22.4445 31.5173 20.3951C32.1745 13.4357 30.3945 7.40185 26.8121 2.052ZM10.568 16.7031C9.00457 16.7031 7.72245 15.2436 7.72245 13.4662C7.72245 11.6889 8.97719 10.2268 10.568 10.2268C12.1588 10.2268 13.4409 11.6863 13.4135 13.4662C13.416 15.2436 12.1588 16.7031 10.568 16.7031ZM21.0837 16.7031C19.5203 16.7031 18.2382 15.2436 18.2382 13.4662C18.2382 11.6889 19.4929 10.2268 21.0837 10.2268C22.6745 10.2268 23.9566 11.6863 23.9292 13.4662C23.9292 15.2436 22.6745 16.7031 21.0837 16.7031Z" fill="currentColor"/></svg>', label: t('nav.discord_rp') },
-    { id: 'adblocker', group: 'integrations', icon: icon('M12 3 20 6v5c0 5.1-3.3 8.4-8 10-4.7-1.6-8-4.9-8-10V6l8-3ZM8.5 12l2.2 2.2 4.8-4.8'), label: t('nav.adblocker') },
-    { id: 'auth-token', group: 'integrations', icon: icon('M15 7a4 4 0 1 0-7.2 2.4L4 13.2V17h3v2h3v-2.8l2.4-2.4A4 4 0 0 0 15 7Zm-4 0h.01M16 4l4 4'), label: t('nav.auth_token') },
-    { id: 'themes', group: 'appearance', icon: icon('M12 3a9 9 0 1 0 0 18h1.2a1.8 1.8 0 0 0 1.3-3.1 1.8 1.8 0 0 1 1.3-3.1H18a3 3 0 0 0 3-3A8.9 8.9 0 0 0 12 3ZM7 11h.01M8.5 7.5h.01M13 6h.01M17 9h.01'), label: t('nav.themes') },
-    { id: 'custom-css', group: 'appearance', icon: icon('M8 8 4 12l4 4M16 8l4 4-4 4M14 5l-4 14'), label: t('nav.custom_css') },
-    { id: 'settings', group: 'settings', icon: icon('M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7ZM19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.5 1.5-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-2.1v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1-1.5-1.5.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H7v-2.1h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 1.5-1.5.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V5h2.1v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1 1.5 1.5-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v2.1h-.2a1.7 1.7 0 0 0-1.6 1Z'), label: t('nav.settings') },
+    { id: 'player', group: 'player', icon: icon('player'), label: t('nav.player') },
+    { id: 'lyrics', group: 'player', icon: icon('lyrics'), label: t('nav.lyrics') },
+    { id: 'equalizer', group: 'player', icon: icon('equalizer'), label: t('nav.equalizer') },
+    { id: 'downloader', group: 'tools', icon: icon('downloader'), label: t('nav.downloader') },
+    { id: 'offline-cache', group: 'tools', icon: icon('offline'), label: t('nav.offline') },
+    { id: 'history', group: 'tools', icon: icon('history'), label: t('nav.history') },
+    { id: 'geo-bypass', group: 'integrations', icon: icon('geo'), label: t('nav.geo_bypass') },
+    { id: 'discord-rp', group: 'integrations', icon: icon('discord'), label: t('nav.discord_rp') },
+    { id: 'adblocker', group: 'integrations', icon: icon('adblock'), label: t('nav.adblocker') },
+    { id: 'auth-token', group: 'integrations', icon: icon('key'), label: t('nav.auth_token') },
+    { id: 'themes', group: 'appearance', icon: icon('themes'), label: t('nav.themes') },
+    { id: 'custom-css', group: 'appearance', icon: icon('css'), label: t('nav.custom_css') },
+    { id: 'settings', group: 'settings', icon: icon('settings'), label: t('nav.settings') },
   ];
 
   const navHTML = NAV_ITEMS.map((n, i) =>

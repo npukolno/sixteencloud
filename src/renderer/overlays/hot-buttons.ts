@@ -1,19 +1,10 @@
 import { getScriptTranslations } from '../../shared/i18n';
 import { scJs } from '../../shared/sc-selectors';
+import { BAR_ICON_BODY, barIconSvg } from '../../shared/icons';
 
 // Quick actions in SoundCloud's bottom bar, right after the cover/title
 // badge: full-screen lyrics, add to the download queue, save for offline.
 // SoundCloud may re-render the bar, so the group is re-attached when missing.
-
-const ICONS = {
-  lyrics: '<path d="M4 6h10M4 10h10M4 14h6"/><path d="M18 5v9.5"/><circle cx="16" cy="16.5" r="2.5"/>',
-  download: '<path d="M12 4v11m-4-4 4 4 4-4M5 20h14"/>',
-  offline: '<path d="M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9.5a3.5 3.5 0 0 1 .5 6.96"/><path d="M12 11v7m0 0-2.5-2.5M12 18l2.5-2.5"/>',
-};
-
-function iconSvg(body: string): string {
-  return `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
-}
 
 export function getHotButtonsScript(): string {
   const tr = JSON.stringify(getScriptTranslations([
@@ -30,7 +21,7 @@ export function getHotButtonsScript(): string {
       function _t(k, p) { var s = _tr[k] || k; if (p) for (var x in p) s = s.replace('{' + x + '}', p[x]); return s; }
       var SLOT = ${scJs('SOUND_BADGE_SLOT')};
       var ELEMENTS = ${scJs('PLAYER_ELEMENTS')};
-      var ICONS = ${JSON.stringify({ lyrics: iconSvg(ICONS.lyrics), download: iconSvg(ICONS.download), offline: iconSvg(ICONS.offline) })};
+      var ICONS = ${JSON.stringify({ lyrics: barIconSvg(BAR_ICON_BODY.lyrics), download: barIconSvg(BAR_ICON_BODY.download), offline: barIconSvg(BAR_ICON_BODY.offline) })};
       function toast(msg, kind) { if (window.__scToast) window.__scToast(msg, { kind: kind }); }
 
       function button(id, label) {
