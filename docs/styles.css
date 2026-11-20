@@ -627,6 +627,129 @@ button {
   text-wrap: pretty;
 }
 
+/* Spotlight: the one new thing, above the feature bands */
+
+.spotlight {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.85fr);
+  gap: 56px;
+  align-items: center;
+  margin: 8px 0 56px;
+  padding: 44px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+}
+
+.tag {
+  display: inline-block;
+  padding: 3px 9px;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--accent-soft);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.spotlight-title {
+  margin: 18px 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 2.6vw, 2.1rem);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.spotlight-lead {
+  margin: 16px 0 0;
+  max-width: 58ch;
+  font-size: 15.5px;
+  line-height: 1.65;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.spotlight-points {
+  display: grid;
+  gap: 12px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.spotlight-points li {
+  position: relative;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--quiet);
+  text-wrap: pretty;
+}
+
+.spotlight-points li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 8px;
+  height: 1px;
+  background: var(--accent);
+}
+
+.spotlight-points strong {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.sync-demo {
+  display: grid;
+  gap: 18px;
+  padding: 26px 24px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.sync-line {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.sync-time {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.sync-bar {
+  display: block;
+  width: var(--w);
+  height: 10px;
+  border-radius: 5px;
+  background: var(--line-strong);
+}
+
+.sync-line.is-now .sync-time {
+  color: var(--accent-soft);
+}
+
+.sync-line.is-now .sync-bar {
+  background: var(--accent);
+}
+
+@media (max-width: 900px) {
+  .spotlight {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+    padding: 30px 24px;
+    margin-bottom: 40px;
+  }
+}
+
 /* Screens */
 
 .screens {

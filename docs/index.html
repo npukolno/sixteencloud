@@ -98,7 +98,7 @@
       </div>
 
       <div class="hero-bottom">
-        <p class="hero-lead">A real desktop app for the catalog you already use. Ad-free playback, synced lyrics, a 10-band EQ, offline downloads and Discord Rich Presence.</p>
+        <p class="hero-lead">A real desktop app for the catalog you already use. Ad-free playback, synced lyrics you can make yourself, a 10-band EQ, offline downloads and Discord Rich Presence.</p>
         <div class="hero-actions">
           <a class="button" href="https://github.com/npukolno/sixteencloud/releases/tag/v3.0.4" target="_blank" rel="noopener">
             Download v3.0.4
@@ -115,7 +115,7 @@
         </div>
         <div>
           <dt>Toolkit</dt>
-          <dd>Synced lyrics, 10-band EQ, visualizer</dd>
+          <dd>Synced lyrics and lyric sync, 10-band EQ, visualizer</dd>
         </div>
         <div>
           <dt>Build</dt>
@@ -168,9 +168,31 @@
       <div class="section-head reveal">
         <div>
           <h2 class="section-title">Built for listening.</h2>
-          <p class="section-lead">Small details everywhere, so the only thing you notice is the music.</p>
+          <p class="section-lead">The essentials done properly, plus tools that make the music yours.</p>
         </div>
       </div>
+      <div class="spotlight reveal">
+        <div class="spotlight-copy">
+          <span class="tag">New <span aria-hidden="true">·</span> Beta</span>
+          <h3 class="spotlight-title">Make your own synced lyrics.</h3>
+          <p class="spotlight-lead">No synced lyrics for a track? SixteenCloud can time them itself. Find or paste the text, and local speech models place every line and word against the audio. It runs in the background while you keep listening.</p>
+          <ul class="spotlight-points">
+            <li><strong>On your computer.</strong> The models for Russian and English download on demand from the Sync tab and can be removed at any time. The audio is analysed locally.</li>
+            <li><strong>Line and word timing,</strong> including repeated choruses, with a verdict on how well the track was recognised.</li>
+            <li><strong>Saved to a library.</strong> Your syncs appear first among the lyrics versions, in the panel and in full screen.</li>
+          </ul>
+        </div>
+        <div class="spotlight-visual" aria-hidden="true">
+          <div class="sync-demo">
+            <div class="sync-line"><span class="sync-time">00:12.4</span><span class="sync-bar" style="--w:78%"></span></div>
+            <div class="sync-line"><span class="sync-time">00:16.9</span><span class="sync-bar" style="--w:62%"></span></div>
+            <div class="sync-line is-now"><span class="sync-time">00:21.3</span><span class="sync-bar" style="--w:86%"></span></div>
+            <div class="sync-line"><span class="sync-time">00:25.8</span><span class="sync-bar" style="--w:54%"></span></div>
+            <div class="sync-line"><span class="sync-time">00:30.2</span><span class="sync-bar" style="--w:71%"></span></div>
+          </div>
+        </div>
+      </div>
+
       <div class="feature-bands">
         <div class="feature-band reveal">
           <div class="band-mark" aria-hidden="true"><svg viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 30v-6M12 36V20M19 41V15M26 34V22M33 44V12M40 30v-6M47 36V20M54 32V24"/></svg></div>
@@ -181,31 +203,27 @@
           <div class="band-items">
             <article class="feature">
               <h4>Ad-free playback</h4>
-              <p>Request filtering plus cosmetic cleanup. Promoted tracks and banners never reach the player.</p>
+              <p>Promoted tracks and banners never reach the player.</p>
             </article>
             <article class="feature">
               <h4>Synced lyrics</h4>
-              <p>Time-synced LRC across nine sources, smarter track matching and a sync-offset slider. The blurred full-screen mode has ±0.5 s nudges, a version switcher and the cover next to the title.</p>
-            </article>
-            <article class="feature">
-              <h4>Player tools</h4>
-              <p>Skip promoted tracks and 30-second previews, pick up where you left off after a restart, change playback speed, set a sleep timer, seek in 5–30 s steps, loop an A–B section, get track-change notifications and scrobble to ListenBrainz.</p>
+              <p>Time-synced lyrics from nine sources in a blurred full-screen view, with a sync offset, other versions and your own syncs.</p>
             </article>
             <article class="feature">
               <h4>10-band EQ</h4>
-              <p>Presets and your own curves, a preamp and a limiter / loudness leveller. It sits on a master bus every track flows through, so it stays on when the track changes.</p>
+              <p>Presets, your own curves, a preamp and a limiter. It sits on a master bus, so it stays on between tracks.</p>
             </article>
             <article class="feature">
               <h4>Visualizer</h4>
-              <p>Side and centre bars, progress wave, oscilloscope, window edge glow, a retro LED meter and a spectrogram behind the controls, all driven by the actual analyser node and coloured from the cover. Never a fake animation.</p>
+              <p>Bars, waves, an oscilloscope and a spectrogram driven by the real audio and coloured from the cover.</p>
             </article>
             <article class="feature">
-              <h4>Player bar shortcuts</h4>
-              <p>Lyrics, Download and Save offline buttons right next to the cover in the player bar. No panel to open.</p>
+              <h4>Player tools</h4>
+              <p>Playback speed, a sleep timer, an A–B loop, resume after a restart, and skipping promoted tracks and previews.</p>
             </article>
             <article class="feature">
               <h4>Mini player</h4>
-              <p>A 400×134 always-on-top window with artwork, scrubber, like and lyrics buttons. It follows your theme and accent. Ctrl+P to summon, pin it where you like.</p>
+              <p>A small always-on-top window with artwork, a scrubber and lyrics. <code>Ctrl+P</code> to summon it.</p>
             </article>
           </div>
         </div>
@@ -213,28 +231,28 @@
           <div class="band-mark" aria-hidden="true"><svg viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="12" width="34" height="34" rx="2"/><path d="M14 12V7h34v34h-5"/></svg></div>
           <div class="band-head">
             <h3 class="band-title">Library</h3>
-            <p>What you keep, what you play next, and what the outside world sees.</p>
+            <p>What you keep, and what you played.</p>
           </div>
           <div class="band-items">
             <article class="feature">
               <h4>Downloads</h4>
-              <p>Single tracks, playlists three at a time into a zip, all your likes and the current play queue. Streamed to disk, HLS-aware, tagged with cover art.</p>
+              <p>Tracks, playlists, your likes or the play queue, tagged with cover art.</p>
             </article>
             <article class="feature">
               <h4>Offline cache</h4>
-              <p>Played tracks are written to disk and play back without a network. Auto-cache, LRU eviction, a size cap and a one-click clear.</p>
+              <p>Played tracks stay on disk and play back without a network.</p>
+            </article>
+            <article class="feature">
+              <h4>Listening history</h4>
+              <p>Everything you played, with stats and search.</p>
             </article>
             <article class="feature">
               <h4>Bookmarks</h4>
-              <p>Covers, pins, folders and drag to reorder. Timecode bookmarks jump straight to the moment in an hour-long mix.</p>
-            </article>
-            <article class="feature">
-              <h4>Feed without reposts</h4>
-              <p>Show, fold or hide reposts in the home feed, decided from SoundCloud's own feed data rather than page labels.</p>
+              <p>Pin covers, group them in folders and jump to a timecode in a long mix.</p>
             </article>
             <article class="feature">
               <h4>Discord Rich Presence</h4>
-              <p>Track, artist, elapsed time and artwork through the local Discord IPC socket. Works with Discord and Vesktop.</p>
+              <p>Track, artist and elapsed time on your profile. Works with Discord and Vesktop.</p>
             </article>
           </div>
         </div>
@@ -242,60 +260,24 @@
           <div class="band-mark" aria-hidden="true"><svg viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M28 8v6M28 42v6M8 28h6M42 28h6"/><circle cx="28" cy="28" r="10"/><circle cx="28" cy="28" r="2"/></svg></div>
           <div class="band-head">
             <h3 class="band-title">System</h3>
-            <p>The parts that make the app feel native to the machine it runs on.</p>
+            <p>It feels native on the machine it runs on.</p>
           </div>
           <div class="band-items">
             <article class="feature">
-              <h4>Linux, first class</h4>
-              <p>Tray, MPRIS, media keys, desktop entry and notification controls. Not an afterthought.</p>
-            </article>
-            <article class="feature">
-              <h4>Windows taskbar</h4>
-              <p>Previous, play/pause and next under the window thumbnail, with track progress shown on the taskbar button.</p>
-            </article>
-            <article class="feature">
-              <h4>Battery saver</h4>
-              <p>On battery power the visualizer, live blur and animations switch off by themselves. One toggle in Settings if you would rather keep them.</p>
-            </article>
-            <article class="feature">
-              <h4>A side panel that steps aside</h4>
-              <p>Grouped icons with live status dots for the EQ, the geo proxy and downloads. The page makes room for it on mid-size windows and the panel tucks behind an edge handle on narrow ones. <code>Ctrl+G</code> hides or shows it.</p>
-            </article>
-            <article class="feature">
-              <h4>A titlebar that works</h4>
-              <p>Back, forward and reload, plus live chips for the sleep timer, the geo proxy and download progress. In-app toasts confirm what just happened.</p>
-            </article>
-            <article class="feature">
-              <h4>Settings backup</h4>
-              <p>Export or import the whole profile — themes, custom CSS, EQ presets, bookmarks, keybinds, adblock rules — as one JSON file. Tokens never leave the machine.</p>
-            </article>
-            <article class="feature">
-              <h4>Fast start</h4>
-              <p>No fixed splash delay: the interface is in place about a second after launch instead of three.</p>
+              <h4>Native on every platform</h4>
+              <p>Tray, MPRIS and media keys on Linux, taskbar controls on Windows, one codebase for all three.</p>
             </article>
             <article class="feature">
               <h4>Themes and accents</h4>
-              <p>AMOLED Black, Light, Nord, Catppuccin Mocha, Dracula — or your own CSS. The accent colour drives toggles, badges, sliders and buttons everywhere, live — or let it follow the cover art of the playing track.</p>
+              <p>AMOLED, Light, Nord, Catppuccin, Dracula or your own CSS. The accent can follow the cover art.</p>
             </article>
             <article class="feature">
-              <h4>Custom keybinds</h4>
-              <p>Sidebar, play/pause, volume, mini player — every shortcut is rebindable, and conflicts are caught before they stick.</p>
+              <h4>Your shortcuts, your profile</h4>
+              <p>Every shortcut is rebindable, and the whole profile exports as one JSON file.</p>
             </article>
             <article class="feature">
-              <h4>Search shortcuts</h4>
-              <p>Press <code>/</code> or Ctrl+K to jump to search; recent queries open as a dropdown you can trim or clear.</p>
-            </article>
-            <article class="feature">
-              <h4>Geo-unblock</h4>
-              <p>Optional proxy routing for region-locked catalogs. Off by default, one switch away.</p>
-            </article>
-            <article class="feature">
-              <h4>Auto-update</h4>
-              <p>Signed Windows installer and AppImage builds check GitHub Releases for new versions.</p>
-            </article>
-            <article class="feature">
-              <h4>Hardened shell</h4>
-              <p>A strict Content-Security-Policy on the local UI, sandboxed windows and no Node in the page. Sign-in tokens are kept in the system keychain when one is available.</p>
+              <h4>Private and hardened</h4>
+              <p>Sandboxed windows, a strict Content-Security-Policy and sign-in tokens in the system keychain.</p>
             </article>
           </div>
         </div>
@@ -316,23 +298,25 @@
         <div class="screen-tabs" role="tablist" aria-label="Screenshots" aria-orientation="vertical">
           <button class="screen-tab is-active" role="tab" id="tab-1" aria-selected="true" aria-controls="screenView" tabindex="0" data-index="0" data-title="Discover" data-slug="home" data-desc="The Discover feed, minus promoted cards and banners.">Discover</button>
           <button class="screen-tab" role="tab" id="tab-2" aria-selected="false" aria-controls="screenView" tabindex="-1" data-index="1" data-title="Lyrics" data-slug="lyrics" data-desc="Full-screen synced lyrics over a blurred cover backdrop, with sync offset and alternative versions.">Lyrics</button>
-          <button class="screen-tab" role="tab" id="tab-3" aria-selected="false" aria-controls="screenView" tabindex="-1" data-index="2" data-title="Downloads" data-slug="downloader" data-desc="Queue, quality presets, output folder and download history.">Downloads</button>
-          <button class="screen-tab" role="tab" id="tab-4" aria-selected="false" aria-controls="screenView" tabindex="-1" data-index="3" data-title="Themes" data-slug="themes" data-desc="Built-in themes and any accent color you like.">Themes</button>
-          <button class="screen-tab" role="tab" id="tab-5" aria-selected="false" aria-controls="screenView" tabindex="-1" data-index="4" data-title="Settings" data-slug="settings" data-desc="Language, accent color, keybinds and visualizer options.">Settings</button>
-          <button class="screen-tab" role="tab" id="tab-6" aria-selected="false" aria-controls="screenView" tabindex="-1" data-index="5" data-title="Adblock" data-slug="adblocker" data-desc="Request blocking, custom rules and a whitelist.">Adblock</button>
-          <button class="screen-tab" role="tab" id="tab-7" aria-selected="false" aria-controls="screenView" tabindex="-1" data-index="6" data-title="Discord" data-slug="discord" data-desc="Track, artist, elapsed time and buttons on your profile.">Discord</button>
-          <button class="screen-tab" role="tab" id="tab-8" aria-selected="false" aria-controls="screenView" tabindex="-1" data-index="7" data-title="Player" data-slug="player" data-desc="Skip promoted tracks and previews, playback speed, sleep timer, notifications and ListenBrainz.">Player</button>
+          <button class="screen-tab" role="tab" id="tab-3" aria-selected="false" aria-controls="screenView" tabindex="-1" data-index="2" data-title="Sync" data-slug="sync" data-desc="Make time-synced lyrics for any track: local models place every line in time. Pick the track, find or paste the lyrics, press start.">Sync</button>
+          <button class="screen-tab" role="tab" id="tab-4" aria-selected="false" aria-controls="screenView" tabindex="-1" data-index="3" data-title="Downloads" data-slug="downloader" data-desc="Queue, quality presets, output folder and download history.">Downloads</button>
+          <button class="screen-tab" role="tab" id="tab-5" aria-selected="false" aria-controls="screenView" tabindex="-1" data-index="4" data-title="Themes" data-slug="themes" data-desc="Built-in themes and any accent color you like.">Themes</button>
+          <button class="screen-tab" role="tab" id="tab-6" aria-selected="false" aria-controls="screenView" tabindex="-1" data-index="5" data-title="Settings" data-slug="settings" data-desc="Language, accent color, keybinds and visualizer options.">Settings</button>
+          <button class="screen-tab" role="tab" id="tab-7" aria-selected="false" aria-controls="screenView" tabindex="-1" data-index="6" data-title="Adblock" data-slug="adblocker" data-desc="Request blocking, custom rules and a whitelist.">Adblock</button>
+          <button class="screen-tab" role="tab" id="tab-8" aria-selected="false" aria-controls="screenView" tabindex="-1" data-index="7" data-title="Discord" data-slug="discord" data-desc="Track, artist, elapsed time and buttons on your profile.">Discord</button>
+          <button class="screen-tab" role="tab" id="tab-9" aria-selected="false" aria-controls="screenView" tabindex="-1" data-index="8" data-title="Player" data-slug="player" data-desc="Skip promoted tracks and previews, playback speed, sleep timer, notifications and ListenBrainz.">Player</button>
         </div>
 
         <figure class="screen-view" id="screenView" role="tabpanel" aria-labelledby="tab-1">
           <div class="screen-frame">
             <div class="screen-bar">
               <span id="screenPath">screenshots/home.jpg</span>
-              <span id="screenCount">01 / 08</span>
+              <span id="screenCount">01 / 09</span>
             </div>
             <div class="screen-stack">
               <img class="screen-shot is-active" src="screenshots/home.jpg" alt="SixteenCloud Discover feed in the dark theme" width="1280" height="719" decoding="async">
               <img class="screen-shot" src="screenshots/lyrics.jpg" alt="SixteenCloud synced lyrics view" width="1280" height="719" decoding="async" loading="lazy">
+              <img class="screen-shot" src="screenshots/sync.jpg" alt="SixteenCloud Sync tab: models, track and lyrics" width="1280" height="719" decoding="async" loading="lazy">
               <img class="screen-shot" src="screenshots/downloader.jpg" alt="SixteenCloud download queue and history" width="1280" height="719" decoding="async" loading="lazy">
               <img class="screen-shot" src="screenshots/themes.jpg" alt="SixteenCloud theme picker" width="1280" height="719" decoding="async" loading="lazy">
               <img class="screen-shot" src="screenshots/settings.jpg" alt="SixteenCloud settings panel" width="1280" height="719" decoding="async" loading="lazy">
