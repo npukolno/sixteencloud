@@ -3,14 +3,16 @@ import Store from 'electron-store';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
-import { IPC_CHANNELS, STORE_DEFAULTS } from '../../shared/constants';
+import { IPC_CHANNELS, STORE_DEFAULTS, emptyHistoryStats } from '../../shared/constants';
 import type { StoreSchema } from '../../shared/types';
 import { logInfo, logWarn } from '../logger';
 import { READ_ONLY_STORE_KEYS, validateStoreKey, validateStoreValue } from './validators';
 import { assertMainRenderer } from './guard';
+import { HistoryFile, migrateHistory } from './history-file';
 
 let store: Store<StoreSchema> | undefined;
 let encryptionKey: string | null = null;
+let historyFile: HistoryFile | undefined;
 
 /**
  * conf decrypts config.json on every read with a 10 000-round pbkdf2, about
@@ -74,7 +76,35 @@ export function initStore(): Store<StoreSchema> {
     store = open();
   }
   migrateSecrets(store);
+  initHistory(store);
   return store;
+}
+
+/** Listening history is kept outside config.json (see history-file.ts). */
+function initHistory(s: Store<StoreSchema>): void {
+  historyFile = new HistoryFile(app.getPath('userData'), (m) => logWarn('[History]', m));
+  try {
+    const moved = migrateHistory(
+      historyFile,
+      { tracks: (s as any).get('history.tracks'), stats: (s as any).get('history.stats') },
+      () => {
+        (s as any).set('history.tracks', []);
+        (s as any).set('history.stats', emptyHistoryStats());
+      },
+    );
+    if (moved) logInfo('[History] moved the listening history out of config.json');
+  } catch (e: any) {
+    logWarn('[History] migration failed, keeping history in config.json:', e?.message);
+  }
+}
+
+export function getHistoryFile(): HistoryFile {
+  return historyFile as HistoryFile;
+}
+
+/** Write any pending history changes now (quit). */
+export function flushHistory(): void {
+  historyFile?.flush();
 }
 
 /**
@@ -153,6 +183,11 @@ export function setupStoreIPC(mainWindow: BrowserWindow): void {
   ipcMain.handle(IPC_CHANNELS.STORE_GET, (event, key: string) => {
     assertMainRenderer(event, mainWindow);
     validateStoreKey(key);
+    if (key === 'history.tracks') return getHistoryFile().getTracks();
+    if (key === 'history.stats') return getHistoryFile().getStats();
+    if (key === 'history') {
+      return { ...(s.get('history') as object), tracks: getHistoryFile().getTracks(), stats: getHistoryFile().getStats() };
+    }
     return s.get(key);
   });
 
@@ -161,6 +196,8 @@ export function setupStoreIPC(mainWindow: BrowserWindow): void {
     validateStoreKey(key);
     if (READ_ONLY_STORE_KEYS.has(key)) throw new Error('Store key is read-only');
     validateStoreValue(key, value);
+    if (key === 'history.tracks') { getHistoryFile().setTracks(value as unknown[]); return; }
+    if (key === 'history.stats') { getHistoryFile().setStats(value as Record<string, unknown>); return; }
     s.set(key, value);
   });
 

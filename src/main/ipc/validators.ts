@@ -65,6 +65,9 @@ export function validateStoreValue(key: string, value: unknown): void {
   if (key === 'history.maxTracks' && (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 10000)) {
     throw new Error('Invalid history limit');
   }
+  if (key === 'history.tracks' && (!Array.isArray(value) || value.length > 10000 || value.some((t) => !t || typeof t !== 'object' || Array.isArray(t)))) {
+    throw new Error('Invalid history tracks');
+  }
   if (key === 'history.stats' && (!value || typeof value !== 'object' || Array.isArray(value))) {
     throw new Error('Invalid history stats');
   }

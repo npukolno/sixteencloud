@@ -414,9 +414,8 @@ export function getHistoryOverlayScript(): string {
           if (audioElement()) countPlay({ title: title, artist: artist, artworkUrl: artworkUrl, trackUrl: trackUrl });
           flushSeconds(true);
           resetListen();
-          api.storeGet('history').then(function(h) {
-            if (!h) h = { enabled: true, tracks: [] };
-            var tracks = h.tracks || [];
+          api.historyGet().then(function(stored) {
+            var tracks = Array.isArray(stored) ? stored : [];
             tracks.push({ title: title, artist: artist, artworkUrl: artworkUrl, trackUrl: trackUrl, timestamp: new Date().toISOString(), duration: dur });
             var maxTracks = parseInt(limitSelect.value) || 0;
             if (maxTracks > 0 && tracks.length > maxTracks) tracks = tracks.slice(tracks.length - maxTracks);

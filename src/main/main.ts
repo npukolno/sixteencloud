@@ -1,5 +1,5 @@
 import { app, BrowserWindow, globalShortcut } from 'electron';
-import { setupIPC, getStore, initStore } from './ipc';
+import { setupIPC, getStore, initStore, flushHistory } from './ipc';
 import { createTray, destroyTray, setMiniPlayerToggle } from './tray';
 import { checkForUpdates, setupUpdaterIPC } from './updater';
 import { setupDiscordRPC, destroyDiscordRPC } from './discord';
@@ -143,6 +143,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  flushHistory();
   globalShortcut.unregisterAll();
   destroyLinuxDesktopIntegration();
   destroyTray();

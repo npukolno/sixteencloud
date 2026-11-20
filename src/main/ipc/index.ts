@@ -9,7 +9,7 @@ import { setupLyricsIPC } from './lyrics';
 import { setupQuickActionsIPC } from './quick-actions';
 import { setupProfileIPC } from './profile';
 
-export { initStore, getStore, getEncryptionKey, getSecret, setSecret } from './store';
+export { initStore, getStore, getEncryptionKey, getSecret, setSecret, flushHistory } from './store';
 export { assertMainRenderer, safeSend } from './guard';
 export { readResponseBuffer, streamResponseToFile } from './net';
 export { resolveTrackStream, type ResolvedTrackStream } from './soundcloud-api';
