@@ -38,6 +38,11 @@ SixteenCloud wraps the SoundCloud web player in Electron and adds the parts a mu
 | :---: | :---: |
 | ![Synced lyrics](docs/screenshots/lyrics.jpg)<br>*Full-screen synced lyrics over a blurred cover backdrop* | ![Downloader](docs/screenshots/downloader.jpg)<br>*Queue, quality presets, output folder, history* |
 
+### Lyrics sync (beta)
+
+![Lyrics sync](docs/screenshots/sync.jpg)
+*Make time-synced lyrics for any track: models on your computer place every line in time*
+
 ### Player tools
 
 ![Player tools](docs/screenshots/player.jpg)
@@ -53,6 +58,7 @@ SixteenCloud wraps the SoundCloud web player in Electron and adds the parts a mu
 
 - **Ad-free playback** — request filtering plus cosmetic cleanup of promoted content.
 - **Synced lyrics** — LRC from LRCLIB, NetEase and QQ; plain lyrics from Genius, Musixmatch, lyrics.ovh, AZLyrics, ChartLyrics and lyrist. Smarter track matching, a sync-offset slider, an "other versions" picker and a blurred full-screen mode with ±0.5 s sync nudges, a version switcher and the cover next to the title.
+- **Lyrics sync (beta)** — make your own time-synced lyrics for a track that has none. Find or paste the text, and speech models running on your computer place every line and word against the audio, with a verdict on how well the track was recognised. The Russian and English models download on demand from the Sync tab and can be removed at any time; the job runs in the background. Results are saved to a library and offered first among the lyrics versions, in the panel and in full screen.
 - **Player tools** — skip promoted tracks and 30-second previews, resume where you left off after a restart, playback speed, sleep timer, seek steps of 5–30 s, an A–B loop (`Alt+J` / `Alt+L` / `Alt+K`, rebindable), track-change notifications and ListenBrainz scrobbling.
 - **Player bar shortcuts** — Lyrics, Download and Save offline buttons right next to the cover in SoundCloud's own player bar.
 - **Accent from cover art** — the whole interface can take its colour from the playing track.
