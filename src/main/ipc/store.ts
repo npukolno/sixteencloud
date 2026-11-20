@@ -13,6 +13,33 @@ let store: Store<StoreSchema> | undefined;
 let encryptionKey: string | null = null;
 
 /**
+ * conf decrypts config.json on every read with a 10 000-round pbkdf2, about
+ * 5 ms per store.get on the main thread (the file is ~180 KB, so parsing adds
+ * more). Hot paths (track info, presence, auto-cache) read several keys per
+ * track change and every panel opens with a few reads, so the menus stalled.
+ * The file only needs decrypting again when its bytes change, so remember the
+ * last ciphertext → plaintext pair. Each get still parses a fresh object, so
+ * callers can keep mutating what they get back and onDidChange still compares
+ * real before/after values.
+ */
+function memoizeDecrypt(): void {
+  const proto = Store.prototype as unknown as { _encryptData: (data: Buffer | string) => string; __scMemo?: true };
+  if (proto.__scMemo) return;
+  const decrypt = proto._encryptData;
+  let lastRaw: Buffer | null = null;
+  let lastText = '';
+  proto._encryptData = function (this: unknown, data: Buffer | string): string {
+    if (!Buffer.isBuffer(data)) return decrypt.call(this, data);
+    if (lastRaw && lastRaw.equals(data)) return lastText;
+    const text = decrypt.call(this, data);
+    lastRaw = Buffer.from(data);
+    lastText = text;
+    return text;
+  };
+  proto.__scMemo = true;
+}
+
+/**
  * Key for electron-store's at-rest obfuscation. It lives next to the config,
  * so it only keeps the file from being casually readable; real secrets go
  * through {@link getSecret}/{@link setSecret} on top of it.
@@ -32,6 +59,7 @@ export function getEncryptionKey(): string {
 /** Open the config store once; a corrupt file is set aside, never deleted. */
 export function initStore(): Store<StoreSchema> {
   if (store) return store;
+  memoizeDecrypt();
   const open = () => new Store<StoreSchema>({
     defaults: STORE_DEFAULTS as StoreSchema,
     encryptionKey: getEncryptionKey(),
