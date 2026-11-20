@@ -738,9 +738,28 @@ function getOverlayInitScript(): string {
         rail.classList.toggle('sc-rail-peek', on);
       }
       railHandle.addEventListener('mouseenter', function() { setRailPeek(true); });
+      // :hover lags behind a rail that slides in under a still pointer (Chromium
+      // refreshes it after the next mouse move or a delayed fake one, longer on
+      // a busy GPU), so asking the rail whether it is hovered right after the
+      // slide retracted it, and the highlight dropped and came back on the
+      // next move. Track the pointer ourselves and judge by where it is.
+      var pointerX = -1, pointerY = -1;
+      document.addEventListener('mousemove', function(e) { pointerX = e.clientX; pointerY = e.clientY; }, { passive: true, capture: true });
+      function pointerOverRail() {
+        if (rail.matches(':hover')) return true;
+        var r = rail.getBoundingClientRect();
+        var edge = Math.max(r.right, 14 + (parseFloat(getComputedStyle(rail).width) || 0));
+        return pointerX >= 0 && pointerX <= edge && pointerY >= r.top && pointerY <= r.bottom;
+      }
+      function armPeekTimer() {
+        railPeekTimer = setTimeout(function() {
+          railPeekTimer = null;
+          if (pointerOverRail()) armPeekTimer(); else setRailPeek(false);
+        }, 300);
+      }
       railHandle.addEventListener('mouseleave', function() {
         // Give the pointer time to travel from the handle onto the rail.
-        railPeekTimer = setTimeout(function() { if (!rail.matches(':hover')) setRailPeek(false); }, 300);
+        armPeekTimer();
       });
       rail.addEventListener('mouseleave', function() { setRailPeek(false); });
 
